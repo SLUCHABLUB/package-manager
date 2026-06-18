@@ -1,0 +1,7 @@
+name = "sl"
+author = "mtoyoda"
+
+[download]
+github.repository = "mtoyoda/repo"
+
+[build]

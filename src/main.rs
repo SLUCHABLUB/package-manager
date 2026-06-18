@@ -1,23 +1,34 @@
+mod arguments;
+
+use crate::arguments::Arguments;
 use anyhow::Context;
+use clap::Parser;
 use fs_err::read_to_string;
+use package_manager::recipe::Recipe;
 use tracing::error;
 use tracing::info;
-
-const MANIFEST_LOCATION: &str = "/etc/package-manager.manifest.toml";
 
 fn main() {
     tracing_subscriber::fmt::init();
 
-    match try_main() {
+    let arguments = Arguments::parse();
+
+    match try_main(arguments) {
         Ok(()) => (),
         Err(error) => error!("{:#}", error),
     };
-
-    info!("done");
 }
 
-fn try_main() -> anyhow::Result<()> {
-    let _: String = read_to_string(MANIFEST_LOCATION).context("reading package manifest")?;
+fn try_main(arguments: Arguments) -> anyhow::Result<()> {
+    let recipe = read_to_string(&arguments.install_recipe)?;
+    let recipe = toml::from_str::<Recipe>(&recipe).with_context(|| {
+        format!(
+            "parsing the recipe at `{}`",
+            arguments.install_recipe.display()
+        )
+    })?;
+
+    info!("{recipe:#?}");
 
     Ok(())
 }
