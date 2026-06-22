@@ -4,6 +4,8 @@ use crate::arguments::Arguments;
 use anyhow::Context;
 use clap::Parser;
 use fs_err::read_to_string;
+use package_manager::Directories;
+use package_manager::download;
 use package_manager::recipe::Recipe;
 use tracing::error;
 use tracing::info;
@@ -27,6 +29,11 @@ fn try_main(arguments: Arguments) -> anyhow::Result<()> {
             arguments.install_recipe.display()
         )
     })?;
+
+    let directories = Directories::new().context("determining user directories")?;
+
+    download(&recipe, &directories.source_directory(&recipe))
+        .with_context(|| format!("downloading the source code for `{}`", recipe.name))?;
 
     info!("{recipe:#?}");
 

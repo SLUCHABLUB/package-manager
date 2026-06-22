@@ -1,0 +1,9 @@
+name = "package-manager"
+author = "sluchablub"
+
+[download]
+version = "0.1.0"
+github.repository = "sluchablub/package-manager"
+
+[build]
+cargo = {}

@@ -1,3 +1,4 @@
+use semver::VersionReq;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -16,8 +17,16 @@ pub struct Recipe {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct Download {
+    /// The version range that this recipe can build.
+    pub version: VersionReq,
+    #[serde(flatten)]
+    pub source: DownloadSource,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum Download {
+pub enum DownloadSource {
     Github { repository: Box<str> },
 }
 
@@ -25,6 +34,17 @@ pub enum Download {
 pub struct Build {
     #[serde(default)]
     dependencies: Dependencies,
+    #[serde(flatten)]
+    system: BuildSystem,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BuildSystem {
+    Cargo {
+        #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
+        features: Box<[Box<str>]>,
+    },
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -37,19 +57,12 @@ pub enum Install {
     /// Install the package into `/usr`.
     #[default]
     System,
-    /// Install the package into `$HOME` using the `$XDG_*_DIRS`.
+    /// Install the package into `$HOME` using the `$XDG_*_HOME`.
     User,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Dependencies {
     #[serde(flatten)]
-    pub versions: HashMap<Box<str>, Version>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case", untagged)]
-pub enum Version {
-    Semver(semver::VersionReq),
-    Opaque { opaque: Box<str> },
+    pub versions: HashMap<Box<str>, VersionReq>,
 }
