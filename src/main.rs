@@ -5,10 +5,12 @@ use anyhow::Context;
 use clap::Parser;
 use fs_err::read_to_string;
 use package_manager::Directories;
+use package_manager::Ledger;
 use package_manager::build;
 use package_manager::download;
 use package_manager::recipe::Recipe;
 use tracing::error;
+use tracing::info;
 
 fn main() {
     tracing_subscriber::fmt::init();
@@ -41,6 +43,14 @@ fn try_main(arguments: Arguments) -> anyhow::Result<()> {
         &directories.target_directory(&recipe),
     )
     .with_context(|| format!("building `{}`", recipe.name))?;
+
+    let ledger = Ledger::from_target_directory(&directories.target_directory(&recipe))
+        .with_context(|| format!("creating ledger for package `{}`", recipe.name))?;
+
+    info!(
+        "{}",
+        toml::to_string(&ledger).context("serialising the ledger")?
+    );
 
     Ok(())
 }

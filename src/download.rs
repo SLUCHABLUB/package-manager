@@ -1,10 +1,9 @@
+use crate::Directories;
 use crate::recipe::DownloadSource;
 use crate::recipe::Recipe;
 use anyhow::Context;
 use bstr::BStr;
 use bstr::ByteSlice as _;
-use fs_err::create_dir_all;
-use fs_err::remove_dir_all;
 use gix::ObjectId;
 use gix::progress::Discard;
 use gix::protocol::handshake::Ref;
@@ -15,7 +14,6 @@ use gix::worktree::state::checkout;
 use non_zero::non_zero;
 use semver::Version;
 use semver::VersionReq;
-use std::io;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use tracing::info;
@@ -37,16 +35,6 @@ pub fn download(
     }
 }
 
-fn make_empty_directory(directory: &Path) -> anyhow::Result<()> {
-    match remove_dir_all(directory) {
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
-        result => result,
-    }?;
-    create_dir_all(directory)?;
-
-    Ok(())
-}
-
 struct VersionTag<'name> {
     name: &'name BStr,
     commit: ObjectId,
@@ -59,8 +47,8 @@ fn download_github(
     repository_location: &Path,
     destination: &Path,
 ) -> anyhow::Result<()> {
-    make_empty_directory(repository_location).context("preparing repository location")?;
-    make_empty_directory(destination).context("preparing destination directory")?;
+    Directories::make_empty(repository_location).context("preparing the repository location")?;
+    Directories::make_empty(destination).context("preparing the destination directory")?;
 
     let url = format!("https://github.com/{repository_path}.git");
 

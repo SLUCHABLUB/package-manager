@@ -2,6 +2,10 @@ use crate::PACKAGE_NAME;
 use crate::recipe::Recipe;
 use anyhow::Context;
 use directories::ProjectDirs;
+use fs_err::create_dir_all;
+use fs_err::remove_dir_all;
+use std::io;
+use std::path::Path;
 use std::path::PathBuf;
 
 #[non_exhaustive]
@@ -35,5 +39,15 @@ impl Directories {
         self.repositories
             .join(&*recipe.name)
             .with_added_extension("git")
+    }
+
+    pub fn make_empty(directory: &Path) -> anyhow::Result<()> {
+        match remove_dir_all(directory) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+            result => result,
+        }?;
+        create_dir_all(directory)?;
+
+        Ok(())
     }
 }

@@ -1,3 +1,4 @@
+use crate::Directories;
 use crate::recipe::BuildSystem;
 use crate::recipe::Recipe;
 use anyhow::Context;
@@ -8,6 +9,8 @@ use std::process::Command;
 use tracing::warn;
 
 pub fn build(recipe: &Recipe, source: &Path, target: &Path) -> anyhow::Result<()> {
+    Directories::make_empty(target).context("preparing the target directory")?;
+
     for (dependency, version) in &recipe.build.dependencies.versions {
         warn!("TODO: install `{dependency}` version {version} as a build dependency");
     }
