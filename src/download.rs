@@ -97,6 +97,8 @@ fn download_github(
 }
 
 fn to_tag(reference: &Ref) -> Option<(&BStr, ObjectId)> {
+    const TAG_PREFIX: &[u8] = b"refs/tags/";
+
     let (name, commit) = match reference {
         Ref::Direct {
             full_ref_name,
@@ -108,12 +110,15 @@ fn to_tag(reference: &Ref) -> Option<(&BStr, ObjectId)> {
             object,
         } => (full_ref_name, object),
         // These shouldn't be able to be tags.
-        Ref::Symbolic { .. } | Ref::Unborn { .. } => return None,
+        Ref::Symbolic { full_ref_name, .. } | Ref::Unborn { full_ref_name, .. } => {
+            debug_assert!(!full_ref_name.starts_with(TAG_PREFIX));
+            return None;
+        }
     };
 
-    let name = name.strip_prefix(b"refs/tags/")?;
+    let name = name.strip_prefix(TAG_PREFIX)?.as_bstr();
 
-    Some((name.as_bstr(), *commit))
+    Some((name, *commit))
 }
 
 fn parse_version(tag_name: &BStr) -> anyhow::Result<Version> {
