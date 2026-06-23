@@ -8,6 +8,7 @@ use std::path::PathBuf;
 pub struct Directories {
     sources: PathBuf,
     targets: PathBuf,
+    repositories: PathBuf,
 }
 
 impl Directories {
@@ -18,6 +19,7 @@ impl Directories {
         Ok(Directories {
             sources: project_directories.cache_dir().join("sources"),
             targets: project_directories.cache_dir().join("targets"),
+            repositories: project_directories.cache_dir().join("repositories"),
         })
     }
 
@@ -27,5 +29,11 @@ impl Directories {
 
     pub fn target_directory(&self, recipe: &Recipe) -> PathBuf {
         self.targets.join(&*recipe.name)
+    }
+
+    pub fn repository_directory(&self, recipe: &Recipe) -> PathBuf {
+        self.repositories
+            .join(&*recipe.name)
+            .with_added_extension("git")
     }
 }
