@@ -5,6 +5,7 @@ use anyhow::Context;
 use clap::Parser;
 use fs_err::read_to_string;
 use package_manager::Directories;
+use package_manager::build;
 use package_manager::download;
 use package_manager::recipe::Recipe;
 use tracing::error;
@@ -37,6 +38,13 @@ fn try_main(arguments: Arguments) -> anyhow::Result<()> {
         &directories.source_directory(&recipe),
     )
     .with_context(|| format!("downloading the source code for `{}`", recipe.name))?;
+
+    build(
+        &recipe,
+        &directories.source_directory(&recipe),
+        &directories.target_directory(&recipe),
+    )
+    .with_context(|| format!("building `{}`", recipe.name))?;
 
     Ok(())
 }
