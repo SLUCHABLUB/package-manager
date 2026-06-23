@@ -22,13 +22,9 @@ fn main() {
 }
 
 fn try_main(arguments: Arguments) -> anyhow::Result<()> {
-    let recipe = read_to_string(&arguments.install_recipe)?;
-    let recipe = toml::from_str::<Recipe>(&recipe).with_context(|| {
-        format!(
-            "parsing the recipe at `{}`",
-            arguments.install_recipe.display()
-        )
-    })?;
+    let recipe = read_to_string(&arguments.recipe)?;
+    let recipe = toml::from_str::<Recipe>(&recipe)
+        .with_context(|| format!("parsing the recipe at `{}`", arguments.recipe.display()))?;
 
     let directories = Directories::new().context("determining user directories")?;
 
