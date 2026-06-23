@@ -33,15 +33,19 @@ pub enum DownloadSource {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Build {
     #[serde(default)]
-    dependencies: Dependencies,
+    pub dependencies: Dependencies,
     #[serde(flatten)]
-    system: BuildSystem,
+    pub system: BuildSystem,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BuildSystem {
     Cargo {
+        // TODO: locked: bool,
+        // TODO: profile: Box<str>,
+        // TODO: no-default-features: bool,
+        // TODO: bins/examples
         #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
         features: Box<[Box<str>]>,
     },
