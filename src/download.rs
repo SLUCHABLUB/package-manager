@@ -1,4 +1,5 @@
-use crate::Directories;
+use crate::directories::RecipeDirectories;
+use crate::fs;
 use crate::recipe::DownloadSource;
 use crate::recipe::Recipe;
 use anyhow::Context;
@@ -14,24 +15,16 @@ use gix::worktree::state::checkout;
 use non_zero::non_zero;
 use semver::Version;
 use semver::VersionReq;
-use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use tracing::info;
 use tracing::warn;
 
-pub fn download(
-    recipe: &Recipe,
-    repository_location: &Path,
-    destination: &Path,
-) -> anyhow::Result<()> {
+pub fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result<()> {
     match &recipe.download.source {
-        DownloadSource::Github { repository } => download_github(
-            repository,
-            &recipe.download.version,
-            repository_location,
-            destination,
-        )
-        .with_context(|| format!("downloading github repository {repository}")),
+        DownloadSource::Github { repository } => {
+            download_github(repository, &recipe.download.version, directories)
+                .with_context(|| format!("downloading github repository {repository}"))
+        }
     }
 }
 
@@ -44,19 +37,19 @@ struct VersionTag<'name> {
 fn download_github(
     repository_path: &str,
     target_version: &VersionReq,
-    repository_location: &Path,
-    destination: &Path,
+    directories: &RecipeDirectories,
 ) -> anyhow::Result<()> {
-    Directories::make_empty(repository_location).context("preparing the repository location")?;
-    Directories::make_empty(destination).context("preparing the destination directory")?;
+    fs::make_empty_directory(&directories.repository)
+        .context("preparing the repository location")?;
+    fs::make_empty_directory(&directories.source).context("preparing the destination directory")?;
 
     let url = format!("https://github.com/{repository_path}.git");
 
     let mut progress = Discard;
     let interrupt = AtomicBool::new(false);
 
-    let repository =
-        gix::init_bare(repository_location).context("initialising the destination repository")?;
+    let repository = gix::init_bare(&directories.repository)
+        .context("initialising the destination repository")?;
 
     let remote = repository.remote_at(url).context("adding the remote")?;
 
@@ -127,8 +120,6 @@ fn download_github(
         .receive(&mut progress, &interrupt)
         .context("fetching the repository")?;
 
-    let repository = gix::open(repository_location).context("reopening the repository")?;
-
     let commit = repository
         .find_commit(tag.commit)
         .context("finding the commit")?;
@@ -144,7 +135,7 @@ fn download_github(
 
     let _outcome = checkout(
         &mut index,
-        destination,
+        &directories.source,
         repository.objects.clone(),
         &file_counter,
         &byte_counter,

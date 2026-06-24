@@ -1,15 +1,15 @@
-use crate::Directories;
+use crate::RecipeDirectories;
+use crate::fs;
 use crate::recipe::BuildSystem;
 use crate::recipe::Recipe;
 use anyhow::Context;
 use anyhow::bail;
 use bstr::ByteSlice;
-use std::path::Path;
 use std::process::Command;
 use tracing::warn;
 
-pub fn build(recipe: &Recipe, source: &Path, target: &Path) -> anyhow::Result<()> {
-    Directories::make_empty(target).context("preparing the target directory")?;
+pub fn build(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result<()> {
+    fs::make_empty_directory(&directories.target).context("preparing the target directory")?;
 
     for (dependency, version) in &recipe.build.dependencies.versions {
         warn!("TODO: install `{dependency}` version {version} as a build dependency");
@@ -28,10 +28,10 @@ pub fn build(recipe: &Recipe, source: &Path, target: &Path) -> anyhow::Result<()
             command
                 .arg("install")
                 .arg("--path")
-                .arg(source)
+                .arg(&directories.source)
                 .arg("--no-track")
                 .arg("--root")
-                .arg(target)
+                .arg(&directories.target)
                 .arg("--features")
                 .arg(features.join(" "));
         }
