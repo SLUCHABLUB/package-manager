@@ -41,7 +41,7 @@ fn try_main(arguments: Arguments) -> anyhow::Result<()> {
 
     build(&recipe, &recipe_directories).with_context(|| format!("building `{}`", recipe.name))?;
 
-    let ledger = Ledger::from_target_directory(&recipe_directories.target)
+    let ledger = Ledger::new(&recipe_directories)
         .with_context(|| format!("creating ledger for package `{}`", recipe.name))?;
 
     info!(

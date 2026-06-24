@@ -1,3 +1,4 @@
+use crate::RecipeDirectories;
 use anyhow::Context;
 use serde::Deserialize;
 use serde::Serialize;
@@ -10,17 +11,17 @@ pub struct Ledger {
 }
 
 impl Ledger {
-    pub fn from_target_directory(directory: &Path) -> anyhow::Result<Ledger> {
+    pub fn new(directories: &RecipeDirectories) -> anyhow::Result<Ledger> {
         let mut files = Vec::new();
 
-        for entry in WalkDir::new(directory) {
+        for entry in WalkDir::new(&directories.target) {
             let entry = entry.context("walking the directory")?;
 
             if entry.file_type().is_dir() {
                 continue;
             }
 
-            files.push(entry.into_path().into_boxed_path());
+            files.push(entry.into_path().strip_prefix(&directories.target)?.into());
         }
 
         Ok(Ledger {
