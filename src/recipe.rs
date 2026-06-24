@@ -7,6 +7,7 @@ use std::collections::HashMap;
 pub struct Recipe {
     pub name: Box<str>,
     pub author: Box<str>,
+    pub version: Version,
 
     #[serde(default)]
     pub provides: HashMap<Box<str>, Version>,
@@ -21,7 +22,7 @@ pub struct Recipe {
 
 impl Recipe {
     pub fn provides(&self, package_name: &str, version: &Version) -> bool {
-        &*self.name == package_name && self.download.version.satisfies(version)
+        &*self.name == package_name && self.version.satisfies(version)
             || self
                 .provides
                 .get(package_name)
@@ -30,16 +31,8 @@ impl Recipe {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Download {
-    /// The version that this recipe builds.
-    pub version: Version,
-    #[serde(flatten)]
-    pub source: DownloadSource,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum DownloadSource {
+pub enum Download {
     Github { repository: Box<str> },
 }
 
@@ -52,7 +45,7 @@ pub struct Build {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "system", rename_all = "snake_case")]
 pub enum BuildSystem {
     Cargo {
         // TODO: locked: bool,

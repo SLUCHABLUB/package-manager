@@ -1,9 +1,9 @@
 name = "package-manager"
 author = "sluchablub"
+version = "*"
 
 [download]
-version = "0.1.0"
 github.repository = "sluchablub/package-manager"
 
 [build]
-cargo = {}
+system = "cargo"

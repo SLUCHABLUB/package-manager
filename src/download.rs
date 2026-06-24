@@ -1,7 +1,7 @@
 use crate::Version;
 use crate::directories::RecipeDirectories;
 use crate::fs;
-use crate::recipe::DownloadSource;
+use crate::recipe::Download;
 use crate::recipe::Recipe;
 use anyhow::Context;
 use bstr::BStr;
@@ -19,9 +19,9 @@ use tracing::info;
 use tracing::warn;
 
 pub fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result<()> {
-    match &recipe.download.source {
-        DownloadSource::Github { repository } => {
-            download_github(repository, &recipe.download.version, directories)
+    match &recipe.download {
+        Download::Github { repository } => {
+            download_github(repository, &recipe.version, directories)
                 .with_context(|| format!("downloading github repository {repository}"))
         }
     }

@@ -1,12 +1,12 @@
 name = "bat"
 author = "David Peter"
+version = "0.26.1"
 
 [download]
-version = "0.26.1"
 github.repository = "sharkdp/bat"
 
 [build]
-cargo = {}
+system = "cargo"
 
 [dependencies]
 libgit2 = "1.9"

@@ -30,7 +30,7 @@ pub fn find_recipe(package_name: &str, version: &Version) -> anyhow::Result<Reci
 
             warn!("skipping the provides field in the recipe");
 
-            if &*recipe.name == package_name && recipe.download.version.satisfies(version) {
+            if &*recipe.name == package_name && recipe.version.satisfies(version) {
                 if found_recipe.is_some() {
                     warn!("not consulting the manifest");
                     bail!("multiple recipes provide `{package_name}` version `{version}`");
