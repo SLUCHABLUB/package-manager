@@ -12,10 +12,10 @@ pub fn build(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result
     fs::make_empty_directory(&directories.target).context("preparing the target directory")?;
 
     for (dependency, version) in &recipe.build.dependencies.versions {
-        warn!("TODO: install `{dependency}` version {version} as a build dependency");
+        warn!("not checking the build dependency of `{dependency}` version `{version}`");
     }
 
-    warn!("TODO: Sandbox the build");
+    warn!("not sand-boxing the build");
 
     let mut command;
 
