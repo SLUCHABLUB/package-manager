@@ -1,4 +1,4 @@
-use semver::VersionReq;
+use crate::Version;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -18,8 +18,8 @@ pub struct Recipe {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Download {
-    /// The version range that this recipe can build.
-    pub version: VersionReq,
+    /// The version that this recipe builds.
+    pub version: Version,
     #[serde(flatten)]
     pub source: DownloadSource,
 }
@@ -68,5 +68,5 @@ pub enum Install {
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Dependencies {
     #[serde(flatten)]
-    pub versions: HashMap<Box<str>, VersionReq>,
+    pub versions: HashMap<Box<str>, Version>,
 }

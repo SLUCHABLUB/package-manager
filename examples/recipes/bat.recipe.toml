@@ -7,3 +7,9 @@ github.repository = "sharkdp/bat"
 
 [build]
 cargo = {}
+
+[dependencies]
+libgit2 = "1.9"
+libgcc_s = "1"
+libm = "6"
+libc = "6"

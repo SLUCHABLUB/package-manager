@@ -5,6 +5,7 @@ use anyhow::Context;
 use clap::Parser;
 use directories::ProjectDirs;
 use fs_err::read_to_string;
+use package_manager::PACKAGE_NAME;
 use package_manager::prepare_install;
 use package_manager::recipe::Recipe;
 use std::path::PathBuf;
@@ -23,7 +24,7 @@ fn main() {
 }
 
 fn try_main(arguments: Arguments) -> anyhow::Result<()> {
-    let project_directories = ProjectDirs::from_path(PathBuf::from(env!("CARGO_PKG_NAME")))
+    let project_directories = ProjectDirs::from_path(PathBuf::from(PACKAGE_NAME))
         .context("determining project directories")?;
 
     let recipe = read_to_string(&arguments.recipe)?;

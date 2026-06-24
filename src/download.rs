@@ -1,3 +1,4 @@
+use crate::Version;
 use crate::directories::RecipeDirectories;
 use crate::fs;
 use crate::recipe::DownloadSource;
@@ -13,8 +14,6 @@ use gix::remote::fetch::Shallow;
 use gix::remote::ref_map;
 use gix::worktree::state::checkout;
 use non_zero::non_zero;
-use semver::Version;
-use semver::VersionReq;
 use std::sync::atomic::AtomicBool;
 use tracing::info;
 use tracing::warn;
@@ -36,7 +35,7 @@ struct VersionTag<'name> {
 
 fn download_github(
     repository_path: &str,
-    target_version: &VersionReq,
+    target_version: &Version,
     directories: &RecipeDirectories,
 ) -> anyhow::Result<()> {
     fs::make_empty_directory(&directories.repository)
@@ -82,16 +81,11 @@ fn download_github(
             version,
         };
 
-        if target_version.matches(&tag.version)
+        if tag.version.satisfies(target_version)
             && best_tag
                 .as_ref()
                 .is_none_or(|best| tag.version > best.version)
         {
-            if !tag.version.build.is_empty() {
-                info!("skipping version `{}` due to build metadata", tag.version);
-                continue;
-            }
-
             best_tag = Some(tag);
         }
     }
@@ -179,5 +173,5 @@ fn parse_version(tag_name: &BStr) -> anyhow::Result<Version> {
         .strip_prefix("v")
         .context("parsing tag as `v`-prefixed version")?;
 
-    Version::parse(version).with_context(|| format!("parsing `{version}` as a semantic version"))
+    Ok(Version::from(version))
 }
