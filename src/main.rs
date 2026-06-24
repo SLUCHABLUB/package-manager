@@ -6,11 +6,9 @@ use anyhow::anyhow;
 use clap::Parser;
 use directories::ProjectDirs;
 use package_manager::PACKAGE_NAME;
-use package_manager::find_recipe;
-use package_manager::prepare_install;
+use package_manager::PackageSet;
 use std::path::PathBuf;
 use tracing::error;
-use tracing::info;
 
 fn main() {
     tracing_subscriber::fmt::init();
@@ -32,14 +30,11 @@ fn try_main(arguments: Arguments) -> anyhow::Result<()> {
     let project_directories = ProjectDirs::from_path(PathBuf::from(PACKAGE_NAME))
         .context("determining project directories")?;
 
-    let recipe = find_recipe(&arguments.recipe, &arguments.version)?;
+    let mut packages = PackageSet::new();
 
-    let (ledger, _target_directory) = prepare_install(&recipe, &project_directories)?;
+    packages.add(&arguments.recipe, &arguments.version)?;
 
-    info!(
-        "{}",
-        toml::to_string(&ledger).context("serialising the ledger")?
-    );
+    packages.prepare_install(&project_directories)?;
 
     Ok(())
 }

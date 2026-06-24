@@ -8,12 +8,25 @@ pub struct Recipe {
     pub name: Box<str>,
     pub author: Box<str>,
 
+    #[serde(default)]
+    pub provides: HashMap<Box<str>, Version>,
+
     pub download: Download,
     pub build: Build,
     #[serde(default)]
     pub install: Install,
     #[serde(default)]
     pub dependencies: Dependencies,
+}
+
+impl Recipe {
+    pub fn provides(&self, package_name: &str, version: &Version) -> bool {
+        &*self.name == package_name && self.download.version.satisfies(version)
+            || self
+                .provides
+                .get(package_name)
+                .is_some_and(|provided_version| provided_version.satisfies(version))
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

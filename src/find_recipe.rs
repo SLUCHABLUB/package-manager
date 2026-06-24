@@ -7,6 +7,7 @@ use fs_err::read_dir;
 use fs_err::read_to_string;
 use tracing::warn;
 
+// TODO: Cache the recipes.
 pub fn find_recipe(package_name: &str, version: &Version) -> anyhow::Result<Recipe> {
     let recipe_directories = ["./examples/recipes"];
     warn!("hardcoding the recipe directories to {recipe_directories:?}");
