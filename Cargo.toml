@@ -10,6 +10,7 @@ clap = { version = "4.6.1", features = ["derive"] }
 directories = "6.0.0"
 fs-err = "3.3.0"
 gix = { version = "0.84.0", features = ["blocking-http-transport-reqwest-rust-tls"] }
+goblin = { version = "0.10.7", default-features = false, features = ["std", "elf32", "elf64", "endian_fd"] }
 non-zero = "0.2.0"
 semver = { version = "1.0.28", features = ["serde"] }
 serde = { version = "1.0.228", features = ["derive"] }

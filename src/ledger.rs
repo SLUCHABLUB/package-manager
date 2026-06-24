@@ -7,7 +7,7 @@ use walkdir::WalkDir;
 
 #[derive(Serialize, Deserialize)]
 pub struct Ledger {
-    files: Box<[Box<Path>]>,
+    pub files: Box<[Box<Path>]>,
 }
 
 impl Ledger {

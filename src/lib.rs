@@ -1,6 +1,7 @@
 pub mod recipe;
 
 mod build;
+mod dependencies;
 mod directories;
 mod download;
 mod fs;
