@@ -1,7 +1,8 @@
 mod arguments;
 
 use crate::arguments::Arguments;
-use anyhow::Context;
+use anyhow::Context as _;
+use anyhow::anyhow;
 use clap::Parser;
 use directories::ProjectDirs;
 use fs_err::read_to_string;
@@ -24,6 +25,11 @@ fn main() {
 }
 
 fn try_main(arguments: Arguments) -> anyhow::Result<()> {
+    // Use a pure rust cryptography provider for rustls to avoid a C-compiler build dependency.
+    rustls_rustcrypto::provider()
+        .install_default()
+        .map_err(|_provider| anyhow!("failed to set the rustls cryptography provider"))?;
+
     let project_directories = ProjectDirs::from_path(PathBuf::from(PACKAGE_NAME))
         .context("determining project directories")?;
 
