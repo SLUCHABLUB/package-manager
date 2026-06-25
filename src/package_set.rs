@@ -1,17 +1,17 @@
 use crate::Version;
-use crate::find_recipe;
+use crate::manifest::Manifest;
 use crate::prepare_install;
 use crate::recipe::Recipe;
 use directories::ProjectDirs;
 
 /// A set of packages to be installed.
 #[derive(Default)]
-pub struct PackageSet {
-    recipes: Vec<Recipe>,
+pub struct PackageSet<'recipes> {
+    recipes: Vec<&'recipes Recipe>,
 }
 
-impl PackageSet {
-    pub fn new() -> PackageSet {
+impl<'recipes> PackageSet<'recipes> {
+    pub fn new() -> PackageSet<'recipes> {
         PackageSet::default()
     }
 
@@ -21,15 +21,20 @@ impl PackageSet {
             .any(|recipe| recipe.provides(package_name, version))
     }
 
-    pub fn add(&mut self, package_name: &str, version: &Version) -> anyhow::Result<()> {
+    pub fn add(
+        &mut self,
+        package_name: &str,
+        version: &Version,
+        manifest: &'recipes Manifest,
+    ) -> anyhow::Result<()> {
         if self.contains(package_name, version) {
             return Ok(());
         }
 
-        let recipe = find_recipe(package_name, version)?;
+        let recipe = manifest.find_recipe(package_name, version)?;
 
         for (dependency, version) in &recipe.dependencies.versions {
-            self.add(dependency, version)?;
+            self.add(dependency, version, manifest)?;
         }
 
         self.recipes.push(recipe);

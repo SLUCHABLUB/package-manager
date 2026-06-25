@@ -5,20 +5,18 @@ use anyhow::Context as _;
 use anyhow::anyhow;
 use clap::Parser;
 use directories::ProjectDirs;
+use fs_err::read_to_string;
+use package_manager::Manifest;
 use package_manager::PACKAGE_NAME;
-use package_manager::PackageSet;
+use package_manager::ResultExtension as _;
 use std::path::PathBuf;
-use tracing::error;
 
 fn main() {
     tracing_subscriber::fmt::init();
 
     let arguments = Arguments::parse();
 
-    match try_main(arguments) {
-        Ok(()) => (),
-        Err(error) => error!("{:#}", error),
-    };
+    try_main(arguments).ok_or_log();
 }
 
 fn try_main(arguments: Arguments) -> anyhow::Result<()> {
@@ -30,11 +28,12 @@ fn try_main(arguments: Arguments) -> anyhow::Result<()> {
     let project_directories = ProjectDirs::from_path(PathBuf::from(PACKAGE_NAME))
         .context("determining project directories")?;
 
-    let mut packages = PackageSet::new();
+    let manifest = read_to_string(&arguments.manifest)?;
+    let manifest = toml::from_str::<Manifest>(&manifest)?;
 
-    packages.add(&arguments.recipe, &arguments.version)?;
-
-    packages.prepare_install(&project_directories)?;
+    manifest
+        .package_set()?
+        .prepare_install(&project_directories)?;
 
     Ok(())
 }

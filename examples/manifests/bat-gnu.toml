@@ -1,0 +1,7 @@
+recipe_directories = ["./examples/recipes"]
+
+[packages]
+bat = "*"
+
+[providers]
+bat = "bat"

@@ -1,8 +1,6 @@
-use package_manager::Version;
+use std::path::Path;
 
 #[derive(clap::Parser)]
 pub(crate) struct Arguments {
-    pub recipe: Box<str>,
-    #[arg(default_value = "*")]
-    pub version: Version,
+    pub manifest: Box<Path>,
 }

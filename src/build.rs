@@ -12,7 +12,7 @@ pub fn build(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result
     fs::make_empty_directory(&directories.target).context("preparing the target directory")?;
 
     for (dependency, version) in &recipe.build.dependencies.versions {
-        warn!("not checking the build dependency of `{dependency}` version `{version}`");
+        warn!("not checking the build dependency of `{dependency}` version {version}");
     }
 
     warn!("not sand-boxing the build");

@@ -96,7 +96,7 @@ impl Display for Version {
                 minor,
                 patch,
             } => write!(f, "{major}.{minor}.{patch}"),
-            Version::NonSemantic(version) => write!(f, "{version}"),
+            Version::NonSemantic(version) => write!(f, "`{version}`"),
             Version::Any => write!(f, "*"),
         }
     }
