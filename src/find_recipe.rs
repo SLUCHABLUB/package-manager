@@ -28,9 +28,7 @@ pub fn find_recipe(package_name: &str, version: &Version) -> anyhow::Result<Reci
             let recipe = toml::from_str::<Recipe>(&recipe)
                 .with_context(|| format!("parsing `{}`", path.display()))?;
 
-            warn!("skipping the provides field in the recipe");
-
-            if &*recipe.name == package_name && recipe.version.satisfies(version) {
+            if recipe.provides(package_name, version) {
                 if found_recipe.is_some() {
                     warn!("not consulting the manifest");
                     bail!("multiple recipes provide `{package_name}` version `{version}`");

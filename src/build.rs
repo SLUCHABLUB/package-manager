@@ -23,7 +23,11 @@ pub fn build(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result
         // TODO: Should we add the version requirement here?
         // TODO: Should we specify the binary?
         // TODO: --message-format json to get better logs?
-        BuildSystem::Cargo { features } => {
+        BuildSystem::Cargo {
+            features,
+            target,
+            environment_variables,
+        } => {
             command = Command::new("cargo");
             command
                 .arg("install")
@@ -31,9 +35,19 @@ pub fn build(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result
                 .arg(&directories.source)
                 .arg("--no-track")
                 .arg("--root")
-                .arg(&directories.target)
-                .arg("--features")
-                .arg(features.join(" "));
+                .arg(&directories.target);
+
+            for (key, value) in environment_variables {
+                command.env(&**key, &**value);
+            }
+
+            if !features.is_empty() {
+                command.arg("--features").arg(features.join(" "));
+            }
+
+            if let Some(target) = target {
+                command.arg("--target").arg(&**target);
+            }
         }
     };
 
@@ -47,7 +61,7 @@ pub fn build_with(command: &mut Command) -> anyhow::Result<()> {
 
     if !output.status.success() {
         bail!(
-            "the build command failed with exit code {}\nstandard output:\n{}\nstandard error:\n{}",
+            "the build command failed with {}\nstandard output:\n{}\nstandard error:\n{}",
             output.status,
             output.stdout.as_bstr(),
             output.stderr.as_bstr(),

@@ -48,12 +48,17 @@ pub struct Build {
 #[serde(tag = "system", rename_all = "snake_case")]
 pub enum BuildSystem {
     Cargo {
+        // TODO: Make this a common field.
+        // The keys and variables should be `OsStr`s but those serialise weirdly.
+        #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+        environment_variables: HashMap<Box<str>, Box<str>>,
         // TODO: locked: bool,
         // TODO: profile: Box<str>,
         // TODO: no-default-features: bool,
         // TODO: bins/examples
         #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
         features: Box<[Box<str>]>,
+        target: Option<Box<str>>,
     },
 }
 
