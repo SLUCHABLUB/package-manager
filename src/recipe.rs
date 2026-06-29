@@ -1,5 +1,7 @@
 use crate::Version;
 use crate::VersionRequirement;
+use anyhow::Context;
+use fs_err::read;
 use reqwest::Url;
 use serde::Deserialize;
 use serde::Serialize;
@@ -8,8 +10,8 @@ use std::path::Path;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Recipe {
+    #[serde(skip)]
     pub name: Box<str>,
-    pub author: Box<str>,
 
     #[serde(default)]
     pub provides: HashMap<Box<str>, Version>,
@@ -23,6 +25,21 @@ pub struct Recipe {
 }
 
 impl Recipe {
+    pub fn read_from(path: &Path) -> anyhow::Result<Recipe> {
+        let filename = path
+            .file_name()
+            .context("determining the recipe's filename")?;
+        let filename = filename.to_string_lossy();
+        let filename = filename.strip_suffix(".toml").unwrap_or(&filename);
+
+        let bytes = read(path)?;
+        let mut recipe: Recipe = toml::from_slice(&bytes)?;
+
+        recipe.name = Box::from(filename);
+
+        Ok(recipe)
+    }
+
     pub fn provides(&self, package_name: &str, version: &VersionRequirement) -> bool {
         self.provides
             .get(package_name)

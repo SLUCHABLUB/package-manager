@@ -2,9 +2,7 @@ use crate::RecipeSet;
 use crate::ResultExtension as _;
 use crate::VersionRequirement;
 use crate::recipe::Recipe;
-use anyhow::Context as _;
 use anyhow::bail;
-use fs_err::read_to_string;
 use serde::Deserialize;
 use serde::Serialize;
 use std::cell::OnceCell;
@@ -93,12 +91,7 @@ impl Manifest {
                                 return None;
                             }
 
-                            let recipe = read_to_string(&path).ok_or_log()?;
-                            let recipe = toml::from_str::<Recipe>(&recipe)
-                                .with_context(|| format!("parsing `{}`", path.display()))
-                                .ok_or_log()?;
-
-                            Some(recipe)
+                            Recipe::read_from(&path).ok_or_log()
                         }))
                     })
                     .flatten()
