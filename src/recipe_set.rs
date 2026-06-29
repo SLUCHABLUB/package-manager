@@ -6,13 +6,13 @@ use directories::ProjectDirs;
 
 /// A set of packages to be installed.
 #[derive(Default)]
-pub struct PackageSet<'recipes> {
+pub struct RecipeSet<'recipes> {
     recipes: Vec<&'recipes Recipe>,
 }
 
-impl<'recipes> PackageSet<'recipes> {
-    pub fn new() -> PackageSet<'recipes> {
-        PackageSet::default()
+impl<'recipes> RecipeSet<'recipes> {
+    pub fn new() -> RecipeSet<'recipes> {
+        RecipeSet::default()
     }
 
     fn contains(&self, package_name: &str, version: &VersionRequirement) -> bool {
@@ -21,20 +21,20 @@ impl<'recipes> PackageSet<'recipes> {
             .any(|recipe| recipe.provides(package_name, version))
     }
 
-    pub fn add(
+    pub fn add_package(
         &mut self,
-        package_name: &str,
+        name: &str,
         version: &VersionRequirement,
         manifest: &'recipes Manifest,
     ) -> anyhow::Result<()> {
-        if self.contains(package_name, version) {
+        if self.contains(name, version) {
             return Ok(());
         }
 
-        let recipe = manifest.find_recipe(package_name, version)?;
+        let recipe = manifest.find_recipe(name, version)?;
 
         for (dependency, version) in &recipe.dependencies.versions {
-            self.add(dependency, version, manifest)?;
+            self.add_package(dependency, version, manifest)?;
         }
 
         self.recipes.push(recipe);

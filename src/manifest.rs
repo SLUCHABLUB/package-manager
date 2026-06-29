@@ -1,4 +1,4 @@
-use crate::PackageSet;
+use crate::RecipeSet;
 use crate::ResultExtension as _;
 use crate::VersionRequirement;
 use crate::recipe::Recipe;
@@ -28,11 +28,11 @@ pub struct Manifest {
 }
 
 impl Manifest {
-    pub fn package_set(&self) -> anyhow::Result<PackageSet<'_>> {
-        let mut package_set = PackageSet::new();
+    pub fn package_set(&self) -> anyhow::Result<RecipeSet<'_>> {
+        let mut package_set = RecipeSet::new();
 
         for (package, version) in &self.packages {
-            package_set.add(package, version, self)?;
+            package_set.add_package(package, version, self)?;
         }
 
         Ok(package_set)
