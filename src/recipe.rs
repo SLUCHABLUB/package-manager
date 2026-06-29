@@ -41,12 +41,17 @@ pub struct Download {
 #[serde(rename_all = "snake_case")]
 pub enum DownloadSource {
     Github {
-        version: VersionRequirement,
         repository: Box<str>,
+        version: VersionRequirement,
     },
     Tarball {
         url: Url,
         compression: Option<Compression>,
+    },
+    TarballIndex {
+        url: Url,
+        version: VersionRequirement,
+        filename_prefix: Box<str>,
     },
 }
 

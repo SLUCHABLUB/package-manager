@@ -21,8 +21,11 @@ use gix::worktree::state::checkout;
 use lzma_rs::xz_decompress;
 use non_zero::non_zero;
 use std::io::Cursor;
+use std::str::from_utf8;
 use std::sync::atomic::AtomicBool;
 use tar::Archive;
+use tl::Node;
+use tl::ParserOptions;
 use tracing::info;
 use tracing::warn;
 use url::Url;
@@ -42,6 +45,16 @@ pub fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Res
             download_tarball(url, compression, directories)
                 .with_context(|| format!("downloading a tarball from `{url}`"))?
         }
+        DownloadSource::TarballIndex {
+            url,
+            version,
+            filename_prefix,
+        } => {
+            let (tarball_url, compression) = find_in_index(url, version, filename_prefix)?;
+
+            download_tarball(&tarball_url, compression, directories)
+                .with_context(|| format!("downloading a tarball from `{url}`"))?
+        }
     }
 
     if let Some(subdirectory) = &recipe.download.subdirectory {
@@ -57,6 +70,35 @@ pub fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Res
     }
 
     Ok(())
+}
+
+struct Resolver<'requirement, T> {
+    requirement: &'requirement VersionRequirement,
+    best: Option<(T, Version)>,
+}
+
+impl<T> Resolver<'_, T> {
+    fn from_requirement(requirement: &VersionRequirement) -> Resolver<'_, T> {
+        Resolver {
+            requirement,
+            best: None,
+        }
+    }
+
+    fn add_option(&mut self, value: T, version: Version) {
+        if version.satisfies(self.requirement)
+            && self
+                .best
+                .as_ref()
+                .is_none_or(|(_value, best_version)| version > *best_version)
+        {
+            self.best = Some((value, version))
+        }
+    }
+
+    fn best(self) -> Option<T> {
+        self.best.map(|(value, _version)| value)
+    }
 }
 
 struct VersionTag<'name> {
@@ -238,11 +280,11 @@ fn download_tarball(
     Ok(())
 }
 
-fn detect_compression(url_or_path: &str) -> Option<Compression> {
-    let (_, extension) = url_or_path.rsplit_once(".tar")?;
+fn basename_and_compression(url_or_path: &str) -> Option<(&str, Compression)> {
+    let (basename, extension) = url_or_path.rsplit_once(".tar")?;
 
     if extension.is_empty() {
-        return Some(Compression::None);
+        return Some((basename, Compression::None));
     }
 
     let extension = extension.strip_prefix(".")?;
@@ -251,11 +293,81 @@ fn detect_compression(url_or_path: &str) -> Option<Compression> {
         return None;
     }
 
-    Some(match extension {
+    let compression = match extension {
         "xz" => Compression::Xz,
         _ => {
             warn!("unknown compression extension: `.{extension}`");
             return None;
         }
-    })
+    };
+
+    Some((basename, compression))
+}
+
+fn detect_compression(url_or_path: &str) -> Option<Compression> {
+    let (_basename, compression) = basename_and_compression(url_or_path)?;
+    Some(compression)
+}
+
+fn find_in_index(
+    index: &Url,
+    version: &VersionRequirement,
+    filename_prefix: &str,
+) -> anyhow::Result<(Url, Compression)> {
+    let response = reqwest::blocking::get(index.clone())?;
+
+    let response = response.error_for_status()?;
+
+    // We may get redirected.
+    let resolved_index = response.url().clone();
+
+    let bytes = response.bytes()?;
+    let string = from_utf8(&bytes).context("parsing the HTML as UTF-8")?;
+
+    let dom = tl::parse(string, ParserOptions::new()).context("parsing the HTML")?;
+
+    // TODO: Set favouring of compression types.
+    let mut resolver = Resolver::from_requirement(version);
+
+    for node in dom.nodes() {
+        let Node::Tag(tag) = node else {
+            continue;
+        };
+
+        if tag.name() != "a" {
+            continue;
+        }
+
+        let Some(Some(file_name)) = tag.attributes().get("href") else {
+            continue;
+        };
+
+        let Ok(file_name) = from_utf8(file_name.as_bytes()) else {
+            continue;
+        };
+
+        let Some((basename, compression)) = basename_and_compression(file_name) else {
+            continue;
+        };
+
+        let Some(version) = basename.strip_prefix(filename_prefix) else {
+            continue;
+        };
+
+        let version = Version::from(version);
+
+        resolver.add_option((file_name, compression), version);
+    }
+
+    let Some((file_name, compression)) = resolver.best() else {
+        bail!("found file matching version {version}");
+    };
+
+    let url = resolved_index
+        .join(file_name)
+        .context("joining the filename to the index url")?;
+
+    info!("resolved index `{index}` with version {version} to `{url}`");
+
+    Ok((url, compression))
 }

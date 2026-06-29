@@ -7,7 +7,11 @@ libm = "6"
 
 [download]
 subdirectory = "glibc-2.43"
-tarball.url = "https://mirrors.dotsrc.org/gnu/glibc/glibc-2.43.tar.xz"
+
+[download.tarball_index]
+url = "https://ftpmirror.gnu.org/gnu/glibc/"
+version.exact = "2.43"
+filename_prefix = "glibc-"
 
 [build]
 system = "configure_make"
