@@ -1,11 +1,15 @@
 use crate::Version;
 use crate::directories::RecipeDirectories;
 use crate::fs;
-use crate::recipe::Download;
+use crate::recipe::Compression;
+use crate::recipe::DownloadSource;
 use crate::recipe::Recipe;
 use anyhow::Context;
+use anyhow::bail;
 use bstr::BStr;
 use bstr::ByteSlice as _;
+use fs_err::remove_dir_all;
+use fs_err::rename;
 use gix::ObjectId;
 use gix::progress::Discard;
 use gix::protocol::handshake::Ref;
@@ -13,18 +17,44 @@ use gix::remote::Direction;
 use gix::remote::fetch::Shallow;
 use gix::remote::ref_map;
 use gix::worktree::state::checkout;
+use lzma_rs::xz_decompress;
 use non_zero::non_zero;
+use std::io::Cursor;
 use std::sync::atomic::AtomicBool;
+use tar::Archive;
 use tracing::info;
 use tracing::warn;
+use url::Url;
 
 pub fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result<()> {
-    match &recipe.download {
-        Download::Github { repository } => {
+    match &recipe.download.source {
+        DownloadSource::Github { repository } => {
             download_github(repository, &recipe.version, directories)
-                .with_context(|| format!("downloading github repository {repository}"))
+                .with_context(|| format!("downloading github repository {repository}"))?
+        }
+        DownloadSource::Tarball { url, compression } => {
+            let Some(compression) = compression.or_else(|| detect_compression(url.as_str())) else {
+                bail!("could not detect compression of tarball at `{url}`");
+            };
+
+            download_tarball(url, compression, directories)
+                .with_context(|| format!("downloading a tarball from `{url}`"))?
         }
     }
+
+    if let Some(subdirectory) = &recipe.download.subdirectory {
+        // We cannot rename a directory to it's ancestor,
+        // so we take a detour through a temporary directory.
+        let temporary_directory = directories.source.with_added_extension(".tmp");
+
+        rename(directories.source.join(subdirectory), &temporary_directory)?;
+
+        remove_dir_all(&directories.source)?;
+
+        rename(&temporary_directory, &directories.source)?;
+    }
+
+    Ok(())
 }
 
 struct VersionTag<'name> {
@@ -174,4 +204,56 @@ fn parse_version(tag_name: &BStr) -> anyhow::Result<Version> {
         .context("parsing tag as `v`-prefixed version")?;
 
     Ok(Version::from(version))
+}
+
+fn download_tarball(
+    url: &Url,
+    compression: Compression,
+    directories: &RecipeDirectories,
+) -> anyhow::Result<()> {
+    fs::make_empty_directory(&directories.source).context("preparing the destination directory")?;
+
+    let response = reqwest::blocking::get(url.clone())?;
+
+    let response = response.error_for_status()?;
+
+    let compressed_bytes = response.bytes()?;
+
+    let mut decompressed_bytes = Vec::new();
+
+    match compression {
+        Compression::None => decompressed_bytes = compressed_bytes.to_vec(),
+        Compression::Xz => {
+            xz_decompress(&mut &*compressed_bytes, &mut decompressed_bytes)
+                .context("decompressing tarball")?;
+        }
+    }
+
+    let mut archive = Archive::new(Cursor::new(decompressed_bytes));
+
+    archive.unpack(&directories.source)?;
+
+    Ok(())
+}
+
+fn detect_compression(url_or_path: &str) -> Option<Compression> {
+    let (_, extension) = url_or_path.rsplit_once(".tar")?;
+
+    if extension.is_empty() {
+        return Some(Compression::None);
+    }
+
+    let extension = extension.strip_prefix(".")?;
+
+    if extension.contains('/') {
+        return None;
+    }
+
+    Some(match extension {
+        "xz" => Compression::Xz,
+        _ => {
+            warn!("unknown compression extension: `.{extension}`");
+            return None;
+        }
+    })
 }

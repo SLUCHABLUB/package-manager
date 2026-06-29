@@ -1,0 +1,15 @@
+name = "glibc"
+author = "gnu"
+version = "2.43"
+
+[provides]
+libc = "6"
+libm = "6"
+
+[download]
+subdirectory = "glibc-2.43"
+tarball.url = "https://mirrors.dotsrc.org/gnu/glibc/glibc-2.43.tar.xz"
+
+[build]
+system = "configure_make"
+configure_flags = ["--disable-sanity-checks", "--disable-werror"]

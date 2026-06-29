@@ -1,7 +1,9 @@
 use crate::Version;
+use reqwest::Url;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::path::Path;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Recipe {
@@ -31,15 +33,39 @@ impl Recipe {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct Download {
+    pub subdirectory: Option<Box<Path>>,
+    #[serde(flatten)]
+    pub source: DownloadSource,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum Download {
-    Github { repository: Box<str> },
+pub enum DownloadSource {
+    Github {
+        repository: Box<str>,
+    },
+    Tarball {
+        url: Url,
+        compression: Option<Compression>,
+    },
+}
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Compression {
+    None,
+    Xz,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Build {
     #[serde(default)]
     pub dependencies: Dependencies,
+
+    // The keys and variables should be `OsStr`s but those serialise weirdly.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub environment_variables: HashMap<Box<str>, Box<str>>,
     #[serde(flatten)]
     pub system: BuildSystem,
 }
@@ -48,10 +74,6 @@ pub struct Build {
 #[serde(tag = "system", rename_all = "snake_case")]
 pub enum BuildSystem {
     Cargo {
-        // TODO: Make this a common field.
-        // The keys and variables should be `OsStr`s but those serialise weirdly.
-        #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-        environment_variables: HashMap<Box<str>, Box<str>>,
         // TODO: locked: bool,
         // TODO: profile: Box<str>,
         // TODO: no-default-features: bool,
@@ -59,6 +81,10 @@ pub enum BuildSystem {
         #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
         features: Box<[Box<str>]>,
         target: Option<Box<str>>,
+    },
+    ConfigureMake {
+        #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
+        configure_flags: Box<[Box<str>]>,
     },
 }
 

@@ -1,4 +1,5 @@
 use crate::Ledger;
+use crate::ResultExtension as _;
 use crate::Version;
 use crate::recipe::Recipe;
 use anyhow::Context;
@@ -7,6 +8,8 @@ use fs_err::File;
 use goblin::elf::Elf;
 use goblin::elf64::header::ELFMAG;
 use goblin::elf64::header::SELFMAG;
+use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::io::Read;
 use std::path::Path;
 use tracing::warn;
@@ -16,58 +19,98 @@ pub fn check_runtime_dependencies(
     target: &Path,
     recipe: &Recipe,
 ) -> anyhow::Result<()> {
-    for target_relative_path in &ledger.files {
-        let absolute_path = target.join(target_relative_path);
+    let elves: Vec<_> = ledger
+        .files
+        .iter()
+        .filter_map(|target_relative_path| {
+            let absolute_path = target.join(target_relative_path);
 
-        let mut file = File::open(absolute_path)?;
+            parse_node(&absolute_path, target_relative_path.as_os_str())
+        })
+        .collect();
 
-        let mut magic_number_buffer = [0; SELFMAG];
+    let internal_provides: HashMap<&str, &Version> = elves
+        .iter()
+        .flat_map(|elf| {
+            elf.provides
+                .as_ref()
+                .map(|(package, version)| (&**package, version))
+        })
+        .collect();
 
-        file.read_exact(&mut magic_number_buffer)?;
+    for elf in &elves {
+        for (name, needed_version) in &elf.needs {
+            let name = &**name;
 
-        if magic_number_buffer != *ELFMAG {
-            continue;
-        }
-
-        let mut full_buffer = Vec::from(magic_number_buffer);
-
-        file.read_to_end(&mut full_buffer)?;
-
-        let elf = Elf::parse(&full_buffer)?;
-
-        for library in elf.libraries {
-            let (name, needed_version) = parse_so_name(library)
-                .with_context(|| format!("parsing {library} as a shared object file name"))?;
+            if let Some(internally_provided_version) = internal_provides.get(name)
+                && internally_provided_version.satisfies(needed_version)
+            {
+                continue;
+            }
 
             let Some(declared_version) = recipe.dependencies.versions.get(name) else {
                 bail!(
-                    "the file `{}` requires the library `{library}` but it was not declared as a dependency of `{}`",
-                    target_relative_path.display(),
-                    &recipe.name
+                    "the file `{}` requires the library `{name}` with version {needed_version} but it was not declared as a dependency of `{}`",
+                    elf.file_name.display(),
+                    recipe.name
                 );
             };
 
-            if !declared_version.satisfies(&needed_version) {
+            if !declared_version.satisfies(needed_version) {
                 bail!(
-                    "the file `{}` requires the library `{library}` but the declared dependency of `{}` has version `{declared_version}`",
-                    target_relative_path.display(),
+                    "the file `{}` requires the library ``{name}` with version {needed_version} but the declared dependency of `{}` has version `{declared_version}`",
+                    elf.file_name.display(),
                     recipe.name,
                 )
             }
-        }
-
-        if let Some(library) = elf.soname {
-            warn!("{} provides {}", recipe.name, library)
         }
     }
 
     Ok(())
 }
 
-fn parse_so_name(name: &str) -> anyhow::Result<(&str, Version)> {
+struct ElfNode<'ledger> {
+    file_name: &'ledger OsStr,
+    provides: Option<(Box<str>, Version)>,
+    needs: HashMap<Box<str>, Version>,
+}
+
+fn parse_node<'ledger>(path: &Path, file_name: &'ledger OsStr) -> Option<ElfNode<'ledger>> {
+    let mut file = File::open(path).ok_or_log()?;
+
+    let mut magic_number_buffer = [0; SELFMAG];
+
+    file.read_exact(&mut magic_number_buffer).ok_or_log()?;
+
+    if magic_number_buffer != *ELFMAG {
+        return None;
+    }
+
+    let mut full_buffer = Vec::from(magic_number_buffer);
+
+    file.read_to_end(&mut full_buffer).ok_or_log()?;
+
+    let elf = Elf::parse(&full_buffer).ok_or_log()?;
+
+    Some(ElfNode {
+        file_name,
+        provides: elf
+            .soname
+            .and_then(|so_name| parse_so_name(so_name).ok_or_log()),
+        needs: elf
+            .libraries
+            .into_iter()
+            .filter_map(|so_name| parse_so_name(so_name).ok_or_log())
+            .collect(),
+    })
+}
+
+fn parse_so_name(name: &str) -> anyhow::Result<(Box<str>, Version)> {
     let (name, suffix) = name
         .split_once(".so")
         .context("splitting on the `.so` extension")?;
+
+    let name = Box::from(name);
 
     if suffix.is_empty() {
         warn!("NEEDED shared object `{name}` is unversioned");

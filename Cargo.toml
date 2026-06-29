@@ -11,11 +11,15 @@ directories = "6.0.0"
 fs-err = "3.3.0"
 gix = { version = "0.84.0", features = ["blocking-http-transport-reqwest"] }
 goblin = { version = "0.10.7", default-features = false, features = ["std", "elf32", "elf64", "endian_fd"] }
+lzma-rs = "0.3.0"
 non-zero = "0.2.0"
+num_cpus = "1.17.0"
 reqwest = { version = "0.13.4", default-features = false, features = ["rustls-no-provider"] }
 rustls-rustcrypto = "0.0.2-alpha"
 serde = { version = "1.0.228", features = ["derive"] }
+tar = "0.4.46"
 toml = { version = "1.1.2", features = ["preserve_order"] }
 tracing = "0.1.44"
 tracing-subscriber = "0.3.23"
+url = { version = "2.5.8", features = ["serde"] }
 walkdir = "2.5.0"

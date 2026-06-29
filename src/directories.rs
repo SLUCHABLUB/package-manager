@@ -10,6 +10,8 @@ pub struct RecipeDirectories {
     pub target: PathBuf,
     /// The path to the bare repository (`.git` directory).
     pub repository: PathBuf,
+    /// The path to the working directory of the build.
+    pub build: PathBuf,
 }
 
 impl RecipeDirectories {
@@ -22,6 +24,7 @@ impl RecipeDirectories {
                 .join("repositories")
                 .join(&*recipe.name)
                 .with_added_extension("git"),
+            build: project.cache_dir().join("build").join(&*recipe.name),
         })
     }
 }
