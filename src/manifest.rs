@@ -38,7 +38,6 @@ impl Manifest {
         Ok(package_set)
     }
 
-    // TODO: Cache the recipes.
     pub fn find_recipe(
         &self,
         package_name: &str,
