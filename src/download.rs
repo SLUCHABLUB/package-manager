@@ -1,4 +1,5 @@
 use crate::Version;
+use crate::VersionRequirement;
 use crate::directories::RecipeDirectories;
 use crate::fs;
 use crate::recipe::Compression;
@@ -28,10 +29,11 @@ use url::Url;
 
 pub fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result<()> {
     match &recipe.download.source {
-        DownloadSource::Github { repository } => {
-            download_github(repository, &recipe.version, directories)
-                .with_context(|| format!("downloading github repository {repository}"))?
-        }
+        DownloadSource::Github {
+            version,
+            repository,
+        } => download_github(repository, version, directories)
+            .with_context(|| format!("downloading github repository {repository}"))?,
         DownloadSource::Tarball { url, compression } => {
             let Some(compression) = compression.or_else(|| detect_compression(url.as_str())) else {
                 bail!("could not detect compression of tarball at `{url}`");
@@ -65,7 +67,7 @@ struct VersionTag<'name> {
 
 fn download_github(
     repository_path: &str,
-    target_version: &Version,
+    target_version: &VersionRequirement,
     directories: &RecipeDirectories,
 ) -> anyhow::Result<()> {
     fs::make_empty_directory(&directories.repository)

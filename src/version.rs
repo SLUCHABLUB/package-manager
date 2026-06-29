@@ -1,194 +1,162 @@
+use crate::ResultExtension;
 use anyhow::Context as _;
 use anyhow::bail;
 use serde::Deserialize;
 use serde::Serialize;
-use std::borrow::Cow;
-use std::cmp::Ordering;
+use serde_with::DeserializeFromStr;
+use serde_with::SerializeDisplay;
 use std::fmt::Display;
 use std::str::FromStr;
 
 #[derive(Eq, PartialEq, Debug, Clone, Serialize, Deserialize)]
-#[serde(try_from = "Representation", into = "Representation")]
-pub enum Version {
-    /// A simple [Semantic Version](https://semver.org).
-    /// Prereleases and build metadata are not supported.
-    /// If you need that, you may use a [non-semantic version](Version::NonSemantic).
-    Semantic {
-        major: u64,
-        minor: u64,
-        patch: u64,
-    },
-    NonSemantic(Box<str>),
-    Any,
+#[serde(transparent)]
+pub struct Version {
+    pub string: Box<str>,
 }
 
 impl Version {
-    pub fn satisfies(&self, other: &Version) -> bool {
-        if *other == Version::Any {
-            return true;
-        }
-
-        match self {
-            // Even patch releases may have breaking changes for unstable software.
-            Version::Semantic {
-                major: 0,
-                minor: _,
-                patch: _,
-            } => self == other,
-            Version::Semantic {
-                major: self_major,
-                minor: self_minor,
-                patch: self_patch,
-            } => {
-                let Version::Semantic {
-                    major: other_major,
-                    minor: other_minor,
-                    patch: other_patch,
-                } = other
-                else {
+    pub fn satisfies(&self, requirement: &VersionRequirement) -> bool {
+        match requirement {
+            VersionRequirement::Exact(requirement) => self == requirement,
+            VersionRequirement::Semantic(requirement) => {
+                let Some(version) = SemanticVersion::from_str(&self.string).ok_or_log() else {
                     return false;
                 };
 
-                // The patch check is technically unnecessary since a patch cannot introduce new functionality upon which someone can rely.
-                // However, it can be nice to specify a patch version to make sure that you get some certain bug fix.
-                // This is optional to do however.
-                self_major == other_major
-                    && (self_minor > other_minor
-                        || self_minor == other_minor && self_patch >= other_patch)
+                version.satisfies(*requirement)
             }
-            _ => self == other,
+            VersionRequirement::Any => true,
         }
+    }
+
+    pub(crate) fn empty() -> Version {
+        Version {
+            string: Box::from(""),
+        }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.string.is_empty()
     }
 }
 
 impl PartialOrd for Version {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            (
-                Version::Semantic {
-                    major: self_major,
-                    minor: self_minor,
-                    patch: self_patch,
-                },
-                Version::Semantic {
-                    major: other_major,
-                    minor: other_minor,
-                    patch: other_patch,
-                },
-            ) => PartialOrd::partial_cmp(
-                &(self_major, self_minor, self_patch),
-                &(other_major, other_minor, other_patch),
-            ),
-            (Version::NonSemantic(self_version), Version::NonSemantic(other_version)) => {
-                (self_version == other_version).then_some(Ordering::Equal)
-            }
-            (Version::Any, Version::Any) => Some(Ordering::Equal),
-            _ => None,
-        }
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        // The error type is literally `()`, so we're not loosing any information.
+        version_compare::compare(&self.string, &other.string)
+            .ok()?
+            .ord()
     }
 }
 
 impl Display for Version {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "`{}`", self.string)
+    }
+}
+
+impl<IntoBoxStr> From<IntoBoxStr> for Version
+where
+    IntoBoxStr: Into<Box<str>>,
+{
+    fn from(string: IntoBoxStr) -> Self {
+        Version {
+            string: string.into(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VersionRequirement {
+    Exact(Version),
+    Semantic(SemanticVersion),
+    Any,
+}
+
+impl VersionRequirement {
+    pub fn always_satisfies(&self, requirement: &VersionRequirement) -> bool {
+        match (self, requirement) {
+            (_, VersionRequirement::Any) => true,
+            (VersionRequirement::Exact(version), VersionRequirement::Exact(requirement)) => {
+                version == requirement
+            }
+            (VersionRequirement::Exact(version), VersionRequirement::Semantic(requirement)) => {
+                SemanticVersion::from_str(&version.string)
+                    .is_ok_and(|version| version.satisfies(*requirement))
+            }
+            (VersionRequirement::Semantic(version), VersionRequirement::Semantic(requirement)) => {
+                version.satisfies(*requirement)
+            }
+            _ => false,
+        }
+    }
+}
+
+impl Display for VersionRequirement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Version::Semantic {
-                major,
-                minor,
-                patch,
-            } => write!(f, "{major}.{minor}.{patch}"),
-            Version::NonSemantic(version) => write!(f, "`{version}`"),
-            Version::Any => write!(f, "*"),
+            VersionRequirement::Exact(version) => write!(f, "{version}"),
+            VersionRequirement::Semantic(version) => write!(f, "{version}"),
+            VersionRequirement::Any => write!(f, "\"any\""),
         }
     }
 }
 
-impl From<&str> for Version {
-    fn from(string: &str) -> Version {
-        if string == "*" {
-            return Version::Any;
-        }
+#[derive(
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, SerializeDisplay, DeserializeFromStr,
+)]
+pub struct SemanticVersion([u64; 3]);
 
-        if let Ok([major, minor, patch]) = parse_semantic(string) {
-            Version::Semantic {
-                major,
-                minor,
-                patch,
-            }
+impl SemanticVersion {
+    fn satisfies(self, requirement: SemanticVersion) -> bool {
+        // Since a patch cannot introduce functionality, it's irrelevant when checking for compatibility.
+        let SemanticVersion([major, minor, _]) = self;
+        let SemanticVersion([major_requirement, minor_requiremnent, _]) = requirement;
+
+        if major_requirement == 0 {
+            self == requirement
         } else {
-            Version::NonSemantic(Box::from(string))
+            major == major_requirement && minor >= minor_requiremnent
         }
     }
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(untagged)]
-enum Representation {
-    Semantic(Cow<'static, str>),
-    NonSemantic { non_semantic: Box<str> },
-}
-impl TryFrom<Representation> for Version {
-    type Error = anyhow::Error;
-
-    fn try_from(representation: Representation) -> Result<Self, Self::Error> {
-        Ok(match representation {
-            Representation::Semantic(string) => {
-                if string == "*" {
-                    return Ok(Version::Any);
-                }
-
-                let [major, minor, patch] = parse_semantic(&string)?;
-
-                Version::Semantic {
-                    major,
-                    minor,
-                    patch,
-                }
-            }
-            Representation::NonSemantic { non_semantic } => Version::NonSemantic(non_semantic),
-        })
+impl Display for SemanticVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let SemanticVersion([major, minor, patch]) = self;
+        write!(f, "{major}.{minor}.{patch}")
     }
 }
 
-impl From<Version> for Representation {
-    fn from(version: Version) -> Self {
-        match version {
-            Version::Semantic {
-                major,
-                minor,
-                patch,
-            } => Representation::Semantic(Cow::Owned(format!("{major}.{minor}.{patch}"))),
-            Version::NonSemantic(string) => Representation::NonSemantic {
-                non_semantic: string,
-            },
-            Version::Any => Representation::Semantic(Cow::Borrowed("*")),
+impl FromStr for SemanticVersion {
+    type Err = anyhow::Error;
+
+    fn from_str(string: &str) -> anyhow::Result<SemanticVersion> {
+        let mut segments = string.split(".");
+
+        let major = segments
+            .next()
+            .expect("`str::split` should not yield an empty iterator");
+
+        let major = u64::from_str(major).context("parsing the major version")?;
+
+        let minor = match segments.next() {
+            Some(segment) => u64::from_str(segment).context("parsing the minor version")?,
+            None if major == 0 => bail!("missing minor version when major is 0"),
+            None => 0,
+        };
+
+        let patch = match segments.next() {
+            Some(segment) => u64::from_str(segment).context("parsing the patch version")?,
+            None if major == 0 => bail!("missing patch version when major is 0"),
+            None => 0,
+        };
+
+        if segments.next().is_some() {
+            bail!("too many segments");
         }
+
+        Ok(SemanticVersion([major, minor, patch]))
     }
-}
-
-fn parse_semantic(string: &str) -> anyhow::Result<[u64; 3]> {
-    let mut segments = string.split(".");
-
-    let major = segments
-        .next()
-        .expect("`str::split` should not yield an empty iterator");
-
-    let major = u64::from_str(major).context("parsing the major version")?;
-
-    let minor = match segments.next() {
-        Some(segment) => u64::from_str(segment).context("parsing the minor version")?,
-        None if major == 0 => bail!("missing minor version when major is 0"),
-        None => 0,
-    };
-
-    let patch = match segments.next() {
-        Some(segment) => u64::from_str(segment).context("parsing the patch version")?,
-        None if major == 0 => bail!("missing patch version when major is 0"),
-        None => 0,
-    };
-
-    if segments.next().is_some() {
-        bail!("too many segments");
-    }
-
-    Ok([major, minor, patch])
 }

@@ -1,15 +1,15 @@
 name = "bat"
 author = "David Peter"
-version = "0.26.1"
 
-[download]
-github.repository = "sharkdp/bat"
+[download.github]
+repository = "sharkdp/bat"
+version.semantic = "0.26.1"
 
 [build]
 system = "cargo"
 
 [dependencies]
-libgit2 = "1.9"
-libgcc_s = "1"
-libm = "6"
-libc = "6"
+libgit2.exact = "1.9"
+libgcc_s.exact = "1"
+libm.exact = "6"
+libc.exact = "6"

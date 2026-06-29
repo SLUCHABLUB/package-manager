@@ -1,12 +1,12 @@
 name = "bat-static"
 author = "David Peter"
-version = "0.26.1"
 
 [provides]
-# bat = "0.26.1"
+bat = "0.26.1"
 
-[download]
-github.repository = "sharkdp/bat"
+[download.github]
+repository = "sharkdp/bat"
+version.semantic = "0.26.1"
 
 [build]
 system = "cargo"

@@ -1,6 +1,7 @@
 use crate::Ledger;
 use crate::ResultExtension as _;
 use crate::Version;
+use crate::VersionRequirement;
 use crate::recipe::Recipe;
 use anyhow::Context;
 use anyhow::bail;
@@ -12,7 +13,6 @@ use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::io::Read;
 use std::path::Path;
-use tracing::warn;
 
 pub fn check_runtime_dependencies(
     ledger: &Ledger,
@@ -56,9 +56,9 @@ pub fn check_runtime_dependencies(
                 );
             };
 
-            if !declared_version.satisfies(needed_version) {
+            if !declared_version.always_satisfies(needed_version) {
                 bail!(
-                    "the file `{}` requires the library ``{name}` with version {needed_version} but the declared dependency of `{}` has version `{declared_version}`",
+                    "the file `{}` requires the library ``{name}` with version {needed_version} but the declared dependency of `{}` has version {declared_version}",
                     elf.file_name.display(),
                     recipe.name,
                 )
@@ -72,7 +72,7 @@ pub fn check_runtime_dependencies(
 struct ElfNode<'ledger> {
     file_name: &'ledger OsStr,
     provides: Option<(Box<str>, Version)>,
-    needs: HashMap<Box<str>, Version>,
+    needs: HashMap<Box<str>, VersionRequirement>,
 }
 
 fn parse_node<'ledger>(path: &Path, file_name: &'ledger OsStr) -> Option<ElfNode<'ledger>> {
@@ -96,25 +96,36 @@ fn parse_node<'ledger>(path: &Path, file_name: &'ledger OsStr) -> Option<ElfNode
         file_name,
         provides: elf
             .soname
-            .and_then(|so_name| parse_so_name(so_name).ok_or_log()),
+            .and_then(|so_name| parse_so_provision(so_name).ok_or_log()),
         needs: elf
             .libraries
             .into_iter()
-            .filter_map(|so_name| parse_so_name(so_name).ok_or_log())
+            .filter_map(|so_name| parse_so_requirement(so_name).ok_or_log())
             .collect(),
     })
 }
 
-fn parse_so_name(name: &str) -> anyhow::Result<(Box<str>, Version)> {
-    let (name, suffix) = name
+fn parse_so_requirement(file_name: &str) -> anyhow::Result<(Box<str>, VersionRequirement)> {
+    let (name, version) = parse_so_provision(file_name)?;
+
+    let requirement = if version.is_empty() {
+        VersionRequirement::Any
+    } else {
+        VersionRequirement::Exact(version)
+    };
+
+    Ok((name, requirement))
+}
+
+fn parse_so_provision(file_name: &str) -> anyhow::Result<(Box<str>, Version)> {
+    let (name, suffix) = file_name
         .split_once(".so")
         .context("splitting on the `.so` extension")?;
 
     let name = Box::from(name);
 
     if suffix.is_empty() {
-        warn!("NEEDED shared object `{name}` is unversioned");
-        return Ok((name, Version::Any));
+        return Ok((name, Version::empty()));
     }
 
     let Some(version) = suffix.strip_prefix(".") else {

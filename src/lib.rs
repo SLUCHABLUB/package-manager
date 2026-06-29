@@ -21,5 +21,6 @@ pub use package_set::PackageSet;
 pub use prepare_install::prepare_install;
 pub use result::ResultExtension;
 pub use version::Version;
+pub use version::VersionRequirement;
 
 pub const PACKAGE_NAME: &str = env!("CARGO_PKG_NAME");

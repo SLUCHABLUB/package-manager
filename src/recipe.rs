@@ -1,4 +1,5 @@
 use crate::Version;
+use crate::VersionRequirement;
 use reqwest::Url;
 use serde::Deserialize;
 use serde::Serialize;
@@ -9,7 +10,6 @@ use std::path::Path;
 pub struct Recipe {
     pub name: Box<str>,
     pub author: Box<str>,
-    pub version: Version,
 
     #[serde(default)]
     pub provides: HashMap<Box<str>, Version>,
@@ -23,12 +23,10 @@ pub struct Recipe {
 }
 
 impl Recipe {
-    pub fn provides(&self, package_name: &str, version: &Version) -> bool {
-        &*self.name == package_name && self.version.satisfies(version)
-            || self
-                .provides
-                .get(package_name)
-                .is_some_and(|provided_version| provided_version.satisfies(version))
+    pub fn provides(&self, package_name: &str, version: &VersionRequirement) -> bool {
+        self.provides
+            .get(package_name)
+            .is_some_and(|provided_version| provided_version.satisfies(version))
     }
 }
 
@@ -43,6 +41,7 @@ pub struct Download {
 #[serde(rename_all = "snake_case")]
 pub enum DownloadSource {
     Github {
+        version: VersionRequirement,
         repository: Box<str>,
     },
     Tarball {
@@ -105,5 +104,5 @@ pub enum Install {
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Dependencies {
     #[serde(flatten)]
-    pub versions: HashMap<Box<str>, Version>,
+    pub versions: HashMap<Box<str>, VersionRequirement>,
 }

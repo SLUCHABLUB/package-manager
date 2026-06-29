@@ -1,6 +1,6 @@
 use crate::PackageSet;
 use crate::ResultExtension as _;
-use crate::Version;
+use crate::VersionRequirement;
 use crate::recipe::Recipe;
 use anyhow::Context as _;
 use anyhow::bail;
@@ -16,7 +16,7 @@ use tracing::warn;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Manifest {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    packages: HashMap<Box<str>, Version>,
+    packages: HashMap<Box<str>, VersionRequirement>,
     /// A map from package name to recipe name.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     providers: HashMap<Box<str>, Box<str>>,
@@ -39,7 +39,11 @@ impl Manifest {
     }
 
     // TODO: Cache the recipes.
-    pub fn find_recipe(&self, package_name: &str, version: &Version) -> anyhow::Result<&Recipe> {
+    pub fn find_recipe(
+        &self,
+        package_name: &str,
+        version: &VersionRequirement,
+    ) -> anyhow::Result<&Recipe> {
         if let Some(recipe_name) = self.providers.get(package_name) {
             return self.find_recipe_named(recipe_name);
         }

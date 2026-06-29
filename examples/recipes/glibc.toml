@@ -1,6 +1,5 @@
 name = "glibc"
 author = "gnu"
-version = "2.43"
 
 [provides]
 libc = "6"

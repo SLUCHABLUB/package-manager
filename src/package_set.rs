@@ -1,4 +1,4 @@
-use crate::Version;
+use crate::VersionRequirement;
 use crate::manifest::Manifest;
 use crate::prepare_install;
 use crate::recipe::Recipe;
@@ -15,7 +15,7 @@ impl<'recipes> PackageSet<'recipes> {
         PackageSet::default()
     }
 
-    fn contains(&self, package_name: &str, version: &Version) -> bool {
+    fn contains(&self, package_name: &str, version: &VersionRequirement) -> bool {
         self.recipes
             .iter()
             .any(|recipe| recipe.provides(package_name, version))
@@ -24,7 +24,7 @@ impl<'recipes> PackageSet<'recipes> {
     pub fn add(
         &mut self,
         package_name: &str,
-        version: &Version,
+        version: &VersionRequirement,
         manifest: &'recipes Manifest,
     ) -> anyhow::Result<()> {
         if self.contains(package_name, version) {
