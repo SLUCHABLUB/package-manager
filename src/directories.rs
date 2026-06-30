@@ -1,7 +1,8 @@
+use crate::State;
 use crate::recipe::Recipe;
-use directories::ProjectDirs;
 use std::path::PathBuf;
 
+// TODO: Make this opaque.
 #[derive(Debug)]
 pub struct RecipeDirectories {
     /// The path to the source code.
@@ -15,16 +16,17 @@ pub struct RecipeDirectories {
 }
 
 impl RecipeDirectories {
-    pub fn new(recipe: &Recipe, project: &ProjectDirs) -> anyhow::Result<RecipeDirectories> {
+    pub(crate) fn new(recipe: &Recipe, state: &State) -> anyhow::Result<RecipeDirectories> {
+        // TODO: Base these on `recipe.download` to allow for cache reuse.
         Ok(RecipeDirectories {
-            source: project.cache_dir().join("sources").join(&*recipe.name),
-            target: project.cache_dir().join("targets").join(&*recipe.name),
-            repository: project
-                .cache_dir()
+            source: state.cache_directory().join("sources").join(&*recipe.name),
+            target: state.cache_directory().join("targets").join(&*recipe.name),
+            repository: state
+                .cache_directory()
                 .join("repositories")
                 .join(&*recipe.name)
                 .with_added_extension("git"),
-            build: project.cache_dir().join("build").join(&*recipe.name),
+            build: state.cache_directory().join("build").join(&*recipe.name),
         })
     }
 }

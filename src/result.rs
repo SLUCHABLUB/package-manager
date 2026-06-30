@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use tracing::error;
 
-pub trait ResultExtension {
+pub(crate) trait ResultExtension {
     type T;
 
     fn ok_or_log(self) -> Option<Self::T>;
