@@ -1,16 +1,13 @@
 use crate::Version;
 use crate::VersionRequirement;
 use crate::directories::RecipeDirectories;
-use crate::fs;
 use crate::recipe::Compression;
-use crate::recipe::DownloadSource;
+use crate::recipe::Download;
 use crate::recipe::Recipe;
 use anyhow::Context;
 use anyhow::bail;
 use bstr::BStr;
 use bstr::ByteSlice as _;
-use fs_err::remove_dir_all;
-use fs_err::rename;
 use gix::ObjectId;
 use gix::progress::Discard;
 use gix::protocol::handshake::Ref;
@@ -31,13 +28,13 @@ use tracing::warn;
 use url::Url;
 
 pub fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result<()> {
-    match &recipe.download.source {
-        DownloadSource::Github {
+    match &recipe.download {
+        Download::Github {
             version,
             repository,
         } => download_github(repository, version, directories)
             .with_context(|| format!("downloading github repository {repository}"))?,
-        DownloadSource::Tarball { url, compression } => {
+        Download::Tarball { url, compression } => {
             let Some(compression) = compression.or_else(|| detect_compression(url.as_str())) else {
                 bail!("could not detect compression of tarball at `{url}`");
             };
@@ -45,7 +42,7 @@ pub fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Res
             download_tarball(url, compression, directories)
                 .with_context(|| format!("downloading a tarball from `{url}`"))?
         }
-        DownloadSource::TarballIndex {
+        Download::TarballIndex {
             url,
             version,
             filename_prefix,
@@ -55,18 +52,6 @@ pub fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Res
             download_tarball(&tarball_url, compression, directories)
                 .with_context(|| format!("downloading a tarball from `{url}`"))?
         }
-    }
-
-    if let Some(subdirectory) = &recipe.download.subdirectory {
-        // We cannot rename a directory to it's ancestor,
-        // so we take a detour through a temporary directory.
-        let temporary_directory = directories.source.with_added_extension(".tmp");
-
-        rename(directories.source.join(subdirectory), &temporary_directory)?;
-
-        remove_dir_all(&directories.source)?;
-
-        rename(&temporary_directory, &directories.source)?;
     }
 
     Ok(())
@@ -112,17 +97,25 @@ fn download_github(
     target_version: &VersionRequirement,
     directories: &RecipeDirectories,
 ) -> anyhow::Result<()> {
-    fs::make_empty_directory(&directories.repository)
-        .context("preparing the repository location")?;
-    fs::make_empty_directory(&directories.source).context("preparing the destination directory")?;
+    let Some(source_directory) = directories.source()?.as_unpopulated() else {
+        info!("using the cached source");
+        return Ok(());
+    };
 
     let url = format!("https://github.com/{repository_path}.git");
 
     let mut progress = Discard;
     let interrupt = AtomicBool::new(false);
 
-    let repository = gix::init_bare(&directories.repository)
-        .context("initialising the destination repository")?;
+    let repository_directory = directories.repository()?;
+
+    let repository = if repository_directory.is_populated() {
+        info!("using the cached repository");
+        gix::open(repository_directory.path()).context("opening the cached repository")?
+    } else {
+        gix::init_bare(repository_directory.path())
+            .context("initialising the destination repository")?
+    };
 
     let remote = repository.remote_at(url).context("adding the remote")?;
 
@@ -203,7 +196,7 @@ fn download_github(
 
     let _outcome = checkout(
         &mut index,
-        &directories.source,
+        source_directory,
         repository.objects.clone(),
         &file_counter,
         &byte_counter,
@@ -255,7 +248,10 @@ fn download_tarball(
     compression: Compression,
     directories: &RecipeDirectories,
 ) -> anyhow::Result<()> {
-    fs::make_empty_directory(&directories.source).context("preparing the destination directory")?;
+    let Some(source_directory) = directories.source()?.as_unpopulated() else {
+        info!("using the cached source");
+        return Ok(());
+    };
 
     let response = reqwest::blocking::get(url.clone())?;
 
@@ -275,7 +271,7 @@ fn download_tarball(
 
     let mut archive = Archive::new(Cursor::new(decompressed_bytes));
 
-    archive.unpack(&directories.source)?;
+    archive.unpack(source_directory)?;
 
     Ok(())
 }

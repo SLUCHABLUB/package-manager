@@ -48,15 +48,8 @@ impl Recipe {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Download {
-    pub subdirectory: Option<Box<Path>>,
-    #[serde(flatten)]
-    pub source: DownloadSource,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum DownloadSource {
+pub enum Download {
     Github {
         repository: Box<str>,
         version: VersionRequirement,
@@ -83,8 +76,9 @@ pub enum Compression {
 pub struct Build {
     #[serde(default)]
     pub dependencies: Dependencies,
+    pub directory: Option<Box<Path>>,
 
-    // The keys and variables should be `OsStr`s but those serialise weirdly.
+    // The keys and values should be `OsStr`s but those serialise weirdly.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub environment_variables: HashMap<Box<str>, Box<str>>,
     #[serde(flatten)]

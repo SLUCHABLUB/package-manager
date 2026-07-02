@@ -6,7 +6,6 @@ libc = "6"
 libm = "6"
 
 [download]
-subdirectory = "glibc-2.43"
 
 [download.tarball_index]
 url = "https://ftpmirror.gnu.org/gnu/glibc/"
@@ -14,5 +13,6 @@ version.exact = "2.43"
 filename_prefix = "glibc-"
 
 [build]
+directory = "glibc-2.43"
 system = "configure_make"
 configure_flags = ["--disable-sanity-checks", "--disable-werror"]

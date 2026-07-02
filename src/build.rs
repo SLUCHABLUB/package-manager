@@ -1,19 +1,23 @@
 use crate::RecipeDirectories;
-use crate::fs;
 use crate::recipe::BuildSystem;
 use crate::recipe::Recipe;
 use anyhow::Context;
 use anyhow::bail;
 use bstr::ByteSlice;
 use std::process::Command;
+use tracing::info;
 use tracing::warn;
 
 const CONFIGURE_MAKE_DISTINATION_DIRECTORY: &str = concat!("DEST", "DIR");
 
 pub fn build(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result<()> {
-    fs::make_empty_directory(&directories.build)
-        .context("preparing the build's working directory")?;
-    fs::make_empty_directory(&directories.target).context("preparing the target directory")?;
+    let Some(target_directory) = directories.target()?.as_unpopulated() else {
+        info!("using cached target");
+        return Ok(());
+    };
+
+    let build_root = directories.build_root()?;
+    let working_directory = directories.build_working()?;
 
     for (dependency, version) in &recipe.build.dependencies.versions {
         warn!("not checking the build dependency of `{dependency}` version {version}");
@@ -32,10 +36,10 @@ pub fn build(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result
             cargo
                 .arg("install")
                 .arg("--path")
-                .arg(&directories.source)
+                .arg(build_root)
                 .arg("--no-track")
                 .arg("--root")
-                .arg(&directories.target);
+                .arg(target_directory);
 
             if !features.is_empty() {
                 cargo.arg("--features").arg(features.join(" "));
@@ -50,7 +54,7 @@ pub fn build(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result
         BuildSystem::ConfigureMake { configure_flags } => {
             let cpu_count = num_cpus::get();
 
-            let mut configure = Command::new(directories.source.join("configure"));
+            let mut configure = Command::new(build_root.join("configure"));
             for flag in configure_flags {
                 configure.arg(&**flag);
             }
@@ -61,7 +65,7 @@ pub fn build(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result
             let mut install = Command::new("make");
             install
                 .arg("install")
-                .env(CONFIGURE_MAKE_DISTINATION_DIRECTORY, &directories.target);
+                .env(CONFIGURE_MAKE_DISTINATION_DIRECTORY, target_directory);
 
             commands.push(configure);
             commands.push(compile);
@@ -76,7 +80,7 @@ pub fn build(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result
     }
 
     for command in &mut commands {
-        command.current_dir(&directories.build);
+        command.current_dir(working_directory);
 
         let output = command.output().with_context(|| {
             format!(

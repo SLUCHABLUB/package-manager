@@ -1,6 +1,7 @@
 use crate::ResultExtension as _;
 use crate::VersionRequirement;
 use crate::recipe::Recipe;
+use anyhow::Context;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -33,7 +34,9 @@ impl Manifest {
                         return None;
                     }
 
-                    Recipe::read_from(&path).ok_or_log()
+                    Recipe::read_from(&path)
+                        .with_context(|| format!("parsing the recipe at `{}`", path.display()))
+                        .ok_or_log()
                 }))
             })
             .flatten()

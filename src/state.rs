@@ -11,6 +11,7 @@ use std::cell::OnceCell;
 use std::path::Path;
 use std::path::PathBuf;
 
+#[derive(Debug)]
 pub struct State {
     main_manifest: Manifest,
     directories: ProjectDirs,
