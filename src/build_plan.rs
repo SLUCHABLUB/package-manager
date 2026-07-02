@@ -2,6 +2,7 @@ use crate::Recipe;
 use crate::State;
 use crate::VersionRequirement;
 use crate::prepare_to_install;
+use fn_error_context::context;
 
 /// A set of recipes to be installed.
 pub(crate) struct BuildPlan<'state> {
@@ -23,6 +24,7 @@ impl<'state> BuildPlan<'state> {
             .any(|recipe| recipe.provides(package_name, version))
     }
 
+    #[context("adding package `{name}` version {version} to the build plan")]
     pub(crate) fn add_package(
         &mut self,
         name: &str,

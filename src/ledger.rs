@@ -1,5 +1,7 @@
 use crate::RecipeDirectories;
+use crate::directories::CacheDirectory;
 use anyhow::Context;
+use fn_error_context::context;
 use serde::Deserialize;
 use serde::Serialize;
 use std::path::Path;
@@ -11,6 +13,10 @@ pub struct Ledger {
 }
 
 impl Ledger {
+    #[context(
+        "creating a ledger of the target directory `{}`",
+        directories.target().map_or(Path::new("<unknown>"), CacheDirectory::path).display()
+    )]
     pub fn new(directories: &RecipeDirectories) -> anyhow::Result<Ledger> {
         let target_directory = directories.target()?.path();
 

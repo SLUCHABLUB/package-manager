@@ -8,6 +8,7 @@ use anyhow::Context;
 use anyhow::bail;
 use bstr::BStr;
 use bstr::ByteSlice as _;
+use fn_error_context::context;
 use gix::ObjectId;
 use gix::progress::Discard;
 use gix::protocol::handshake::Ref;
@@ -27,20 +28,19 @@ use tracing::info;
 use tracing::warn;
 use url::Url;
 
+#[context("downloading the source code for the `{}` recipe", recipe.name)]
 pub fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result<()> {
     match &recipe.download {
         Download::Github {
             version,
             repository,
-        } => download_github(repository, version, directories)
-            .with_context(|| format!("downloading github repository {repository}"))?,
+        } => download_github(repository, version, directories)?,
         Download::Tarball { url, compression } => {
             let Some(compression) = compression.or_else(|| detect_compression(url.as_str())) else {
                 bail!("could not detect compression of tarball at `{url}`");
             };
 
-            download_tarball(url, compression, directories)
-                .with_context(|| format!("downloading a tarball from `{url}`"))?
+            download_tarball(url, compression, directories)?
         }
         Download::TarballIndex {
             url,
@@ -49,8 +49,7 @@ pub fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Res
         } => {
             let (tarball_url, compression) = find_in_index(url, version, filename_prefix)?;
 
-            download_tarball(&tarball_url, compression, directories)
-                .with_context(|| format!("downloading a tarball from `{url}`"))?
+            download_tarball(&tarball_url, compression, directories)?
         }
     }
 
@@ -92,6 +91,7 @@ struct VersionTag<'name> {
     version: Version,
 }
 
+#[context("downloading the github repository {repository_path}")]
 fn download_github(
     repository_path: &str,
     target_version: &VersionRequirement,
@@ -157,8 +157,9 @@ fn download_github(
         }
     }
 
-    let tag = best_tag
-        .with_context(|| format!("could not find a tag matching the version {target_version}"))?;
+    let Some(tag) = best_tag else {
+        bail!("could not find a tag matching the version {target_version}");
+    };
 
     info!(
         "using version {} which corresponds to commit {}",
@@ -233,6 +234,7 @@ fn to_tag(reference: &Ref) -> Option<(&BStr, ObjectId)> {
     Some((name, *commit))
 }
 
+#[context("parsing a version from the `{tag_name}` tag")]
 fn parse_version(tag_name: &BStr) -> anyhow::Result<Version> {
     let tag_name = str::from_utf8(tag_name).context("parsing the tag name as utf-8")?;
 
@@ -243,6 +245,7 @@ fn parse_version(tag_name: &BStr) -> anyhow::Result<Version> {
     Ok(Version::from(version))
 }
 
+#[context("downloading the tarball from `{url}`")]
 fn download_tarball(
     url: &Url,
     compression: Compression,
@@ -265,7 +268,7 @@ fn download_tarball(
         Compression::None => decompressed_bytes = compressed_bytes.to_vec(),
         Compression::Xz => {
             xz_decompress(&mut &*compressed_bytes, &mut decompressed_bytes)
-                .context("decompressing tarball")?;
+                .context("decompressing the tarball")?;
         }
     }
 
@@ -305,6 +308,7 @@ fn detect_compression(url_or_path: &str) -> Option<Compression> {
     Some(compression)
 }
 
+#[context("finding a file matching version {version} in the index at `{index}`")]
 fn find_in_index(
     index: &Url,
     version: &VersionRequirement,

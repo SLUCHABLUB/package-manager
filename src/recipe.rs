@@ -1,6 +1,7 @@
 use crate::Version;
 use crate::VersionRequirement;
 use anyhow::Context;
+use fn_error_context::context;
 use fs_err::read;
 use reqwest::Url;
 use serde::Deserialize;
@@ -25,6 +26,7 @@ pub struct Recipe {
 }
 
 impl Recipe {
+    #[context("parsing the recipe at `{}`", path.display())]
     pub fn read_from(path: &Path) -> anyhow::Result<Recipe> {
         let filename = path
             .file_name()

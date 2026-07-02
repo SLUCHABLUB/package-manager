@@ -4,12 +4,14 @@ use crate::recipe::Recipe;
 use anyhow::Context;
 use anyhow::bail;
 use bstr::ByteSlice;
+use fn_error_context::context;
 use std::process::Command;
 use tracing::info;
 use tracing::warn;
 
 const CONFIGURE_MAKE_DISTINATION_DIRECTORY: &str = concat!("DEST", "DIR");
 
+#[context("building the `{}` recipe", recipe.name)]
 pub fn build(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result<()> {
     let Some(target_directory) = directories.target()?.as_unpopulated() else {
         info!("using cached target");

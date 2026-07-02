@@ -6,6 +6,7 @@ use crate::recipe::Recipe;
 use anyhow::Context as _;
 use anyhow::bail;
 use directories::ProjectDirs;
+use fn_error_context::context;
 use fs_err::read_to_string;
 use std::cell::OnceCell;
 use std::path::Path;
@@ -19,6 +20,7 @@ pub struct State {
 }
 
 impl State {
+    #[context("initialising the package manager state")]
     pub fn initialise(manifest: &Path) -> anyhow::Result<State> {
         let manifest = read_to_string(manifest)?;
         let manifest = toml::from_str(&manifest)?;
@@ -83,6 +85,7 @@ impl State {
         Ok(recipe)
     }
 
+    #[context("creating a build plan")]
     fn build_plan(&self) -> anyhow::Result<BuildPlan<'_>> {
         let mut plan = BuildPlan::new(self);
 

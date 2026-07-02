@@ -5,6 +5,7 @@ use crate::VersionRequirement;
 use crate::recipe::Recipe;
 use anyhow::Context;
 use anyhow::bail;
+use fn_error_context::context;
 use fs_err::File;
 use goblin::elf::Elf;
 use goblin::elf64::header::ELFMAG;
@@ -14,6 +15,7 @@ use std::ffi::OsStr;
 use std::io::Read;
 use std::path::Path;
 
+#[context("checking the runtime dependencies for the built `{}` recipe", recipe.name)]
 pub fn check_runtime_dependencies(
     ledger: &Ledger,
     target: &Path,
@@ -50,17 +52,15 @@ pub fn check_runtime_dependencies(
 
             let Some(declared_version) = recipe.dependencies.versions.get(name) else {
                 bail!(
-                    "the file `{}` requires the library `{name}` with version {needed_version} but it was not declared as a dependency of `{}`",
+                    "the file `{}` requires the library `{name}` with version {needed_version} but it was not declared as a dependency",
                     elf.file_name.display(),
-                    recipe.name
                 );
             };
 
             if !declared_version.always_satisfies(needed_version) {
                 bail!(
-                    "the file `{}` requires the library ``{name}` with version {needed_version} but the declared dependency of `{}` has version {declared_version}",
+                    "the file `{}` requires the library ``{name}` with version {needed_version} but the declared dependency has version {declared_version}",
                     elf.file_name.display(),
-                    recipe.name,
                 )
             }
         }
@@ -117,6 +117,7 @@ fn parse_so_requirement(file_name: &str) -> anyhow::Result<(Box<str>, VersionReq
     Ok((name, requirement))
 }
 
+#[context("parsing the shared object file name")]
 fn parse_so_provision(file_name: &str) -> anyhow::Result<(Box<str>, Version)> {
     let (name, suffix) = file_name
         .split_once(".so")

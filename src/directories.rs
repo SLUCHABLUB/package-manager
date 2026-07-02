@@ -1,6 +1,8 @@
 use crate::State;
 use crate::recipe::Download;
 use crate::recipe::Recipe;
+use anyhow::Context;
+use fn_error_context::context;
 use fs_err::create_dir_all;
 use fs_err::read_dir;
 use fs_err::remove_dir_all;
@@ -43,11 +45,8 @@ pub struct RecipeDirectories<'state> {
 
 impl<'state> RecipeDirectories<'state> {
     // TODO: Take a locked recipe.
-    pub(crate) fn new(
-        recipe: &'state Recipe,
-        state: &'state State,
-    ) -> anyhow::Result<RecipeDirectories<'state>> {
-        Ok(RecipeDirectories {
+    pub(crate) fn new(recipe: &'state Recipe, state: &'state State) -> RecipeDirectories<'state> {
+        RecipeDirectories {
             recipe,
             state,
 
@@ -56,7 +55,7 @@ impl<'state> RecipeDirectories<'state> {
             build_root: OnceCell::new(),
             source: OnceCell::new(),
             repository: OnceCell::new(),
-        })
+        }
     }
 
     pub(crate) fn target(&self) -> anyhow::Result<&CacheDirectory> {
@@ -70,6 +69,7 @@ impl<'state> RecipeDirectories<'state> {
         })
     }
 
+    #[context("preparing the working directory for the build")]
     pub(crate) fn build_working(&self) -> anyhow::Result<&Path> {
         self.build_working
             .get_or_try_init(|| {
@@ -184,10 +184,11 @@ pub(crate) struct CacheDirectory {
 
 impl CacheDirectory {
     fn new(path: PathBuf) -> anyhow::Result<CacheDirectory> {
-        let is_populated = is_directory_populated(&path)?;
+        let is_populated =
+            is_directory_populated(&path).context("detecting if the cache is populated")?;
 
         if !is_populated {
-            make_empty_directory(&path)?;
+            make_empty_directory(&path).context("preparing the directory")?;
         }
 
         Ok(CacheDirectory { path, is_populated })
