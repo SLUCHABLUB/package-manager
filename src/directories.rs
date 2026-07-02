@@ -27,7 +27,7 @@ macro_rules! concat_paths {
 }
 
 #[derive(Debug)]
-pub struct RecipeDirectories<'state> {
+pub(crate) struct RecipeDirectories<'state> {
     recipe: &'state Recipe,
     state: &'state State,
 

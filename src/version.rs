@@ -10,12 +10,12 @@ use std::str::FromStr;
 
 #[derive(Eq, PartialEq, Debug, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct Version {
+pub(crate) struct Version {
     pub string: Box<str>,
 }
 
 impl Version {
-    pub fn satisfies(&self, requirement: &VersionRequirement) -> bool {
+    pub(crate) fn satisfies(&self, requirement: &VersionRequirement) -> bool {
         match requirement {
             VersionRequirement::Exact(requirement) => self == requirement,
             VersionRequirement::Semantic(requirement) => {
@@ -68,14 +68,14 @@ where
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum VersionRequirement {
+pub(crate) enum VersionRequirement {
     Exact(Version),
     Semantic(SemanticVersion),
     Any,
 }
 
 impl VersionRequirement {
-    pub fn always_satisfies(&self, requirement: &VersionRequirement) -> bool {
+    pub(crate) fn always_satisfies(&self, requirement: &VersionRequirement) -> bool {
         match (self, requirement) {
             (_, VersionRequirement::Any) => true,
             (VersionRequirement::Exact(version), VersionRequirement::Exact(requirement)) => {
@@ -106,7 +106,7 @@ impl Display for VersionRequirement {
 #[derive(
     Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, SerializeDisplay, DeserializeFromStr,
 )]
-pub struct SemanticVersion([u64; 3]);
+pub(crate) struct SemanticVersion([u64; 3]);
 
 impl SemanticVersion {
     fn satisfies(self, requirement: SemanticVersion) -> bool {

@@ -12,18 +12,18 @@ mod result;
 mod state;
 mod version;
 
+pub(crate) use build::build;
 pub(crate) use build_plan::BuildPlan;
+pub(crate) use directories::RecipeDirectories;
+pub(crate) use download::download;
+pub(crate) use ledger::Ledger;
+pub(crate) use manifest::Manifest;
+pub(crate) use prepare_to_install::prepare_to_install;
+pub(crate) use recipe::Recipe;
 pub(crate) use result::ResultExtension;
+pub(crate) use version::Version;
+pub(crate) use version::VersionRequirement;
 
-pub use build::build;
-pub use directories::RecipeDirectories;
-pub use download::download;
-pub use ledger::Ledger;
-pub use manifest::Manifest;
-pub use prepare_to_install::prepare_to_install;
-pub use recipe::Recipe;
 pub use state::State;
-pub use version::Version;
-pub use version::VersionRequirement;
 
 pub const PACKAGE_NAME: &str = env!("CARGO_PKG_NAME");

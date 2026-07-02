@@ -8,7 +8,7 @@ use std::path::Path;
 use walkdir::WalkDir;
 
 #[derive(Serialize, Deserialize)]
-pub struct Ledger {
+pub(crate) struct Ledger {
     pub files: Box<[Box<Path>]>,
 }
 
@@ -17,7 +17,7 @@ impl Ledger {
         "creating a ledger of the target directory `{}`",
         directories.target().map_or(Path::new("<unknown>"), CacheDirectory::path).display()
     )]
-    pub fn new(directories: &RecipeDirectories) -> anyhow::Result<Ledger> {
+    pub(crate) fn new(directories: &RecipeDirectories) -> anyhow::Result<Ledger> {
         let target_directory = directories.target()?.path();
 
         let mut files = Vec::new();

@@ -16,7 +16,7 @@ use std::io::Read;
 use std::path::Path;
 
 #[context("checking the runtime dependencies for the built `{}` recipe", recipe.name)]
-pub fn check_runtime_dependencies(
+pub(crate) fn check_runtime_dependencies(
     ledger: &Ledger,
     target: &Path,
     recipe: &Recipe,

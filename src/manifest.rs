@@ -9,7 +9,7 @@ use std::path::Path;
 use tracing::warn;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Manifest {
+pub(crate) struct Manifest {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub packages: HashMap<Box<str>, VersionRequirement>,
     /// A map from package name to recipe name.

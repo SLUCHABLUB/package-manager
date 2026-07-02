@@ -29,7 +29,7 @@ use tracing::warn;
 use url::Url;
 
 #[context("downloading the source code for the `{}` recipe", recipe.name)]
-pub fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result<()> {
+pub(crate) fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result<()> {
     match &recipe.download {
         Download::Github {
             version,

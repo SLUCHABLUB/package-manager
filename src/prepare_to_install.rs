@@ -8,7 +8,7 @@ use crate::recipe::Recipe;
 use std::path::PathBuf;
 use tracing::info;
 
-pub fn prepare_to_install<'state>(
+pub(crate) fn prepare_to_install<'state>(
     recipe: &'state Recipe,
     state: &'state State,
 ) -> anyhow::Result<(Ledger, PathBuf)> {
