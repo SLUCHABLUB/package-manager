@@ -40,7 +40,7 @@ pub(crate) fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyh
                 bail!("could not detect compression of tarball at `{url}`");
             };
 
-            download_tarball(url, compression, directories)?
+            download_tarball(url, compression, directories)?;
         }
         Download::TarballIndex {
             url,
@@ -49,7 +49,7 @@ pub(crate) fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyh
         } => {
             let (tarball_url, compression) = find_in_index(url, version, file_name_prefix)?;
 
-            download_tarball(&tarball_url, compression, directories)?
+            download_tarball(&tarball_url, compression, directories)?;
         }
     }
 
@@ -76,7 +76,7 @@ impl<T> Resolver<'_, T> {
                 .as_ref()
                 .is_none_or(|(_value, best_version)| version > *best_version)
         {
-            self.best = Some((value, version))
+            self.best = Some((value, version));
         }
     }
 
@@ -292,6 +292,7 @@ fn basename_and_compression(url_or_path: &str) -> Option<(&str, Compression)> {
         return None;
     }
 
+    #[expect(clippy::single_match_else)]
     let compression = match extension {
         "xz" => Compression::Xz,
         _ => {

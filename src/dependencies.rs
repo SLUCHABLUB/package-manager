@@ -33,7 +33,7 @@ pub(crate) fn check_runtime_dependencies(
 
     let internal_provides: HashMap<&str, &Version> = elves
         .iter()
-        .flat_map(|elf| {
+        .filter_map(|elf| {
             elf.provides
                 .as_ref()
                 .map(|(package, version)| (&**package, version))

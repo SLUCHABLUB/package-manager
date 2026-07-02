@@ -73,7 +73,7 @@ pub(crate) fn build(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow:
             commands.push(compile);
             commands.push(install);
         }
-    };
+    }
 
     for command in &mut commands {
         for (key, value) in &recipe.build.environment_variables {

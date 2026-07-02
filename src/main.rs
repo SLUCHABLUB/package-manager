@@ -15,6 +15,7 @@ fn main() {
     try_main(arguments).ok_or_log();
 }
 
+#[expect(clippy::needless_pass_by_value)]
 fn try_main(arguments: Arguments) -> anyhow::Result<()> {
     // Use a pure rust cryptography provider for rustls to avoid a C-compiler build dependency.
     rustls_rustcrypto::provider()

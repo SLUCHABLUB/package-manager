@@ -116,7 +116,7 @@ impl<'state> RecipeDirectories<'state> {
                     compression: _,
                 } => {
                     path.push("tarball");
-                    path.push(&*urlencoding::encode(url.as_str()))
+                    path.push(&*urlencoding::encode(url.as_str()));
                 }
                 Download::TarballIndex {
                     url,
@@ -127,7 +127,7 @@ impl<'state> RecipeDirectories<'state> {
                     path.push(&*urlencoding::encode(url.as_str()));
                     path.push(&*urlencoding::encode(&version.to_string()));
                 }
-            };
+            }
 
             CacheDirectory::new(path)
         })
@@ -151,7 +151,7 @@ impl<'state> RecipeDirectories<'state> {
                     error!("internal error: non-git download requested a repository path");
                     path = PathBuf::from("/dev/null");
                 }
-            };
+            }
 
             CacheDirectory::new(path)
         })

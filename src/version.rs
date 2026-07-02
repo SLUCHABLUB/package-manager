@@ -133,7 +133,7 @@ impl FromStr for SemanticVersion {
     type Err = anyhow::Error;
 
     fn from_str(string: &str) -> anyhow::Result<SemanticVersion> {
-        let mut segments = string.split(".");
+        let mut segments = string.split('.');
 
         let major = segments
             .next()
