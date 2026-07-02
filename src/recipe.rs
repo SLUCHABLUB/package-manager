@@ -28,16 +28,16 @@ pub struct Recipe {
 impl Recipe {
     #[context("parsing the recipe at `{}`", path.display())]
     pub fn read_from(path: &Path) -> anyhow::Result<Recipe> {
-        let filename = path
+        let file_name = path
             .file_name()
-            .context("determining the recipe's filename")?;
-        let filename = filename.to_string_lossy();
-        let filename = filename.strip_suffix(".toml").unwrap_or(&filename);
+            .context("determining the recipe's file name")?;
+        let file_name = file_name.to_string_lossy();
+        let file_name = file_name.strip_suffix(".toml").unwrap_or(&file_name);
 
         let bytes = read(path)?;
         let mut recipe: Recipe = toml::from_slice(&bytes)?;
 
-        recipe.name = Box::from(filename);
+        recipe.name = Box::from(file_name);
 
         Ok(recipe)
     }
@@ -63,7 +63,7 @@ pub enum Download {
     TarballIndex {
         url: Url,
         version: VersionRequirement,
-        filename_prefix: Box<str>,
+        file_name_prefix: Box<str>,
     },
 }
 

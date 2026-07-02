@@ -45,9 +45,9 @@ pub fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Res
         Download::TarballIndex {
             url,
             version,
-            filename_prefix,
+            file_name_prefix,
         } => {
-            let (tarball_url, compression) = find_in_index(url, version, filename_prefix)?;
+            let (tarball_url, compression) = find_in_index(url, version, file_name_prefix)?;
 
             download_tarball(&tarball_url, compression, directories)?
         }
@@ -312,7 +312,7 @@ fn detect_compression(url_or_path: &str) -> Option<Compression> {
 fn find_in_index(
     index: &Url,
     version: &VersionRequirement,
-    filename_prefix: &str,
+    file_name_prefix: &str,
 ) -> anyhow::Result<(Url, Compression)> {
     let response = reqwest::blocking::get(index.clone())?;
 
@@ -350,7 +350,7 @@ fn find_in_index(
             continue;
         };
 
-        let Some(version) = basename.strip_prefix(filename_prefix) else {
+        let Some(version) = basename.strip_prefix(file_name_prefix) else {
             continue;
         };
 
@@ -365,7 +365,7 @@ fn find_in_index(
 
     let url = resolved_index
         .join(file_name)
-        .context("joining the filename to the index url")?;
+        .context("joining the file name to the index url")?;
 
     info!("resolved index `{index}` with version {version} to `{url}`");
 

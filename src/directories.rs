@@ -121,7 +121,7 @@ impl<'state> RecipeDirectories<'state> {
                 Download::TarballIndex {
                     url,
                     version,
-                    filename_prefix: _,
+                    file_name_prefix: _,
                 } => {
                     path.push("tarball_index");
                     path.push(&*urlencoding::encode(url.as_str()));

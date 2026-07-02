@@ -10,7 +10,7 @@ libm = "6"
 [download.tarball_index]
 url = "https://ftpmirror.gnu.org/gnu/glibc/"
 version.exact = "2.43"
-filename_prefix = "glibc-"
+file_name_prefix = "glibc-"
 
 [build]
 directory = "glibc-2.43"
