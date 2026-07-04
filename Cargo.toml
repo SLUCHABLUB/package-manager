@@ -3,6 +3,8 @@ name = "package-manager"
 version = "0.1.0"
 edition = "2024"
 
+repository = "https://github.com/SLUCHABLUB/package-manager"
+
 [dependencies]
 anyhow = "1.0.102"
 astral-tl = "0.7.11"

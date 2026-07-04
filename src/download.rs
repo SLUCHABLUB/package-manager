@@ -31,6 +31,7 @@ use url::Url;
 #[context("downloading the source code for the `{}` recipe", recipe.name)]
 pub(crate) fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result<()> {
     match &recipe.download {
+        Download::None => (),
         Download::Github {
             version,
             repository,

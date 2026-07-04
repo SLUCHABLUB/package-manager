@@ -1,0 +1,7 @@
+# Cheating to get rid of the error messages.
+
+name = "glibc"
+author = "gnu"
+
+[provides]
+libgcc_s = "1"

@@ -17,7 +17,9 @@ pub(crate) struct Recipe {
     #[serde(default)]
     pub provides: HashMap<Box<str>, Version>,
 
+    #[serde(default)]
     pub download: Download,
+    #[serde(default)]
     pub build: Build,
     #[serde(default)]
     pub install: Install,
@@ -49,9 +51,12 @@ impl Recipe {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Download {
+    #[default]
+    #[serde(skip)]
+    None,
     Github {
         repository: Box<str>,
         version: VersionRequirement,
@@ -74,7 +79,7 @@ pub(crate) enum Compression {
     Xz,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub(crate) struct Build {
     #[serde(default)]
     pub dependencies: Dependencies,
@@ -87,9 +92,12 @@ pub(crate) struct Build {
     pub system: BuildSystem,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(tag = "system", rename_all = "snake_case")]
 pub(crate) enum BuildSystem {
+    #[default]
+    #[serde(skip)]
+    None,
     Cargo {
         // TODO: locked: bool,
         // TODO: profile: Box<str>,

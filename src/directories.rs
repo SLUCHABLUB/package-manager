@@ -1,4 +1,5 @@
 use crate::State;
+use crate::internal_error::bail_internal;
 use crate::recipe::Download;
 use crate::recipe::Recipe;
 use anyhow::Context;
@@ -9,7 +10,6 @@ use fs_err::remove_dir_all;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
-use tracing::error;
 
 // We use the `once_cell` crate since we need a `*try*` method which is not stable in std.
 type OnceCell<T> = once_cell::unsync::OnceCell<T>;
@@ -103,6 +103,9 @@ impl<'state> RecipeDirectories<'state> {
 
             // TODO: Use the resolved url/version/commit.
             match &self.recipe.download {
+                Download::None => {
+                    bail_internal!("requested a source-cache path with no download method");
+                }
                 Download::Github {
                     repository,
                     version,
@@ -147,9 +150,8 @@ impl<'state> RecipeDirectories<'state> {
                     path.push(&**repository);
                     path.push(&*urlencoding::encode(&version.to_string()));
                 }
-                Download::Tarball { .. } | Download::TarballIndex { .. } => {
-                    error!("internal error: non-git download requested a repository path");
-                    path = PathBuf::from("/dev/null");
+                _ => {
+                    bail_internal!("non-git download requested a repository path");
                 }
             }
 

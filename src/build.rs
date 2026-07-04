@@ -30,6 +30,7 @@ pub(crate) fn build(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow:
     let mut commands = Vec::new();
 
     match &recipe.build.system {
+        BuildSystem::None => (),
         // TODO: Should we add the version requirement here?
         // TODO: Should we specify the binary?
         // TODO: --message-format json to get better logs?
