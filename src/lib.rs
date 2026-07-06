@@ -2,7 +2,6 @@ mod build;
 mod build_plan;
 mod dependencies;
 mod download;
-mod internal_error;
 mod ledger;
 mod manifest;
 mod prepare_to_install;

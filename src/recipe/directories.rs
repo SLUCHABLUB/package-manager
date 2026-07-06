@@ -1,7 +1,6 @@
 use crate::DownloadLock;
 use crate::Recipe;
 use crate::State;
-use crate::internal_error::bail_internal;
 use crate::serde::once_cell_as_option;
 use anyhow::Context;
 use fn_error_context::context;
@@ -107,7 +106,7 @@ impl RecipeDirectories {
 
             match lock {
                 DownloadLock::None => {
-                    bail_internal!("requested a source-cache path with no download method");
+                    return Ok(CacheDirectory::empty());
                 }
                 DownloadLock::Git { url, commit } => {
                     path.push("git");
@@ -180,6 +179,13 @@ impl CacheDirectory {
             path,
             is_populated: OnceTrue::new(is_populated),
         })
+    }
+
+    fn empty() -> CacheDirectory {
+        CacheDirectory {
+            path: PathBuf::from("/var/empty"),
+            is_populated: OnceTrue::new(true),
+        }
     }
 
     pub(crate) fn path(&self) -> &Path {

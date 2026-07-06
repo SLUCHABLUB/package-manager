@@ -111,7 +111,7 @@ fn repository(
                 info!("using the cached repository");
                 gix::open(path).context("opening the cached repository")
             },
-            |path| gix::init(path).context("initialising the git repository"),
+            |path| gix::init_bare(path).context("initialising the git repository"),
         )
 }
 
