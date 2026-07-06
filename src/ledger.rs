@@ -1,6 +1,8 @@
-use crate::RecipeDirectories;
-use crate::directories::CacheDirectory;
+use crate::CacheDirectory;
+use crate::Recipe;
+use crate::State;
 use anyhow::Context;
+use anyhow::bail;
 use fn_error_context::context;
 use serde::Deserialize;
 use serde::Serialize;
@@ -15,10 +17,14 @@ pub(crate) struct Ledger {
 impl Ledger {
     #[context(
         "creating a ledger of the target directory `{}`",
-        directories.target().map_or(Path::new("<unknown>"), CacheDirectory::path).display()
+        recipe.directories.target(recipe, state).map_or(Path::new("<unknown>"), CacheDirectory::path).display()
     )]
-    pub(crate) fn new(directories: &RecipeDirectories) -> anyhow::Result<Ledger> {
-        let target_directory = directories.target()?.path();
+    pub(crate) fn new(recipe: &Recipe, state: &State) -> anyhow::Result<Ledger> {
+        let Some(target_directory) = recipe.directories.target(recipe, state)?.as_populated()
+        else {
+            // Perhaps a big aggressive.
+            bail!("cannot create a ledger for an directory");
+        };
 
         let mut files = Vec::new();
 

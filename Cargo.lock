@@ -182,6 +182,9 @@ name = "bitflags"
 version = "2.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4388bee8683e3d04af747c73422af53102d2bd24d9eadb6cbc100baef4b43f8"
+dependencies = [
+ "serde_core",
+]
 
 [[package]]
 name = "block-buffer"
@@ -971,6 +974,7 @@ dependencies = [
  "nonempty",
  "parking_lot",
  "regex",
+ "serde",
  "signal-hook",
  "smallvec",
  "thiserror",
@@ -985,6 +989,7 @@ dependencies = [
  "bstr",
  "gix-date",
  "gix-error",
+ "serde",
 ]
 
 [[package]]
@@ -1012,6 +1017,7 @@ dependencies = [
  "gix-quote",
  "gix-trace",
  "kstring",
+ "serde",
  "smallvec",
  "thiserror",
  "unicode-bom",
@@ -1080,6 +1086,7 @@ dependencies = [
  "gix-hash",
  "memmap2",
  "nonempty",
+ "serde",
 ]
 
 [[package]]
@@ -1128,6 +1135,7 @@ dependencies = [
  "gix-sec",
  "gix-trace",
  "gix-url",
+ "serde",
  "thiserror",
 ]
 
@@ -1141,6 +1149,7 @@ dependencies = [
  "gix-error",
  "itoa",
  "jiff",
+ "serde",
 ]
 
 [[package]]
@@ -1278,6 +1287,7 @@ dependencies = [
  "bstr",
  "gix-features",
  "gix-path",
+ "serde",
 ]
 
 [[package]]
@@ -1288,6 +1298,7 @@ checksum = "cb0926d3819c837750b4e03c7754901e73f68b8c9b690753a6372a1bed4eedce"
 dependencies = [
  "faster-hex",
  "gix-features",
+ "serde",
  "sha1-checked",
  "thiserror",
 ]
@@ -1313,6 +1324,7 @@ dependencies = [
  "gix-glob",
  "gix-path",
  "gix-trace",
+ "serde",
  "unicode-bom",
 ]
 
@@ -1350,6 +1362,7 @@ dependencies = [
  "libc",
  "memmap2",
  "rustix",
+ "serde",
  "smallvec",
  "thiserror",
 ]
@@ -1375,6 +1388,7 @@ dependencies = [
  "gix-actor",
  "gix-date",
  "gix-error",
+ "serde",
 ]
 
 [[package]]
@@ -1406,6 +1420,7 @@ dependencies = [
  "gix-utils",
  "gix-validate",
  "itoa",
+ "serde",
  "smallvec",
  "thiserror",
 ]
@@ -1427,6 +1442,7 @@ dependencies = [
  "gix-quote",
  "memmap2",
  "parking_lot",
+ "serde",
  "tempfile",
  "thiserror",
 ]
@@ -1448,6 +1464,7 @@ dependencies = [
  "gix-tempfile",
  "memmap2",
  "parking_lot",
+ "serde",
  "smallvec",
  "thiserror",
  "uluru",
@@ -1528,6 +1545,7 @@ dependencies = [
  "gix-utils",
  "maybe-async",
  "nonempty",
+ "serde",
  "thiserror",
 ]
 
@@ -1559,6 +1577,7 @@ dependencies = [
  "gix-utils",
  "gix-validate",
  "memmap2",
+ "serde",
  "thiserror",
 ]
 
@@ -1595,6 +1614,7 @@ dependencies = [
  "gix-revwalk",
  "gix-trace",
  "nonempty",
+ "serde",
 ]
 
 [[package]]
@@ -1622,6 +1642,7 @@ dependencies = [
  "bitflags 2.13.0",
  "gix-path",
  "libc",
+ "serde",
  "windows-sys 0.61.2",
 ]
 
@@ -1635,6 +1656,7 @@ dependencies = [
  "gix-hash",
  "gix-lock",
  "nonempty",
+ "serde",
  "thiserror",
 ]
 
@@ -1713,6 +1735,7 @@ dependencies = [
  "gix-sec",
  "gix-url",
  "reqwest",
+ "serde",
  "thiserror",
 ]
 
@@ -1742,6 +1765,7 @@ dependencies = [
  "bstr",
  "gix-path",
  "percent-encoding",
+ "serde",
  "thiserror",
 ]
 
@@ -1781,6 +1805,7 @@ dependencies = [
  "gix-object",
  "gix-path",
  "gix-validate",
+ "serde",
 ]
 
 [[package]]
@@ -2354,6 +2379,7 @@ version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "558bf9508a558512042d3095138b1f7b8fe90c5467d94f9f1da28b3731c5dbd1"
 dependencies = [
+ "serde",
  "static_assertions",
 ]
 
@@ -2478,6 +2504,9 @@ name = "nonempty"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9737e026353e5cd0736f98eddae28665118eb6f6600902a7f50db585621fecb6"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "nu-ansi-term"
@@ -3479,6 +3508,9 @@ name = "smallvec"
 version = "1.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ed6a63f02c8539c91a8685a86f4099661ba3da017932f6ebbea6de3f0fa7c90"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "socket2"

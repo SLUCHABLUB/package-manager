@@ -1,15 +1,18 @@
+use crate::Compression;
+use crate::DownloadLock;
+use crate::Recipe;
+use crate::RecipeDirectories;
+use crate::Resolver;
+use crate::State;
 use crate::Version;
 use crate::VersionRequirement;
-use crate::directories::RecipeDirectories;
-use crate::recipe::Compression;
-use crate::recipe::Download;
-use crate::recipe::Recipe;
 use anyhow::Context;
 use anyhow::bail;
 use bstr::BStr;
 use bstr::ByteSlice as _;
 use fn_error_context::context;
 use gix::ObjectId;
+use gix::Repository;
 use gix::progress::Discard;
 use gix::protocol::handshake::Ref;
 use gix::remote::Direction;
@@ -19,6 +22,7 @@ use gix::worktree::state::checkout;
 use lzma_rs::xz_decompress;
 use non_zero::non_zero;
 use std::io::Cursor;
+use std::path::Path;
 use std::str::from_utf8;
 use std::sync::atomic::AtomicBool;
 use tar::Archive;
@@ -29,96 +33,38 @@ use tracing::warn;
 use url::Url;
 
 #[context("downloading the source code for the `{}` recipe", recipe.name)]
-pub(crate) fn download(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result<()> {
-    match &recipe.download {
-        Download::None => (),
-        Download::Github {
-            version,
-            repository,
-        } => download_github(repository, version, directories)?,
-        Download::Tarball { url, compression } => {
-            let Some(compression) = compression.or_else(|| detect_compression(url.as_str())) else {
-                bail!("could not detect compression of tarball at `{url}`");
-            };
-
-            download_tarball(url, compression, directories)?;
+pub(crate) fn download(
+    recipe: &Recipe,
+    source_directory: &Path,
+    state: &State,
+) -> anyhow::Result<()> {
+    match recipe.download_lock(state)? {
+        DownloadLock::None => (),
+        DownloadLock::Git { url, commit } => {
+            download_git(url, *commit, source_directory, &recipe.directories, state)?;
         }
-        Download::TarballIndex {
-            url,
-            version,
-            file_name_prefix,
-        } => {
-            let (tarball_url, compression) = find_in_index(url, version, file_name_prefix)?;
-
-            download_tarball(&tarball_url, compression, directories)?;
+        DownloadLock::Tarball { url, compression } => {
+            download_tarball(url, *compression, source_directory)?;
         }
     }
 
     Ok(())
 }
 
-struct Resolver<'requirement, T> {
-    requirement: &'requirement VersionRequirement,
-    best: Option<(T, Version)>,
-}
-
-impl<T> Resolver<'_, T> {
-    fn from_requirement(requirement: &VersionRequirement) -> Resolver<'_, T> {
-        Resolver {
-            requirement,
-            best: None,
-        }
-    }
-
-    fn add_option(&mut self, value: T, version: Version) {
-        if version.satisfies(self.requirement)
-            && self
-                .best
-                .as_ref()
-                .is_none_or(|(_value, best_version)| version > *best_version)
-        {
-            self.best = Some((value, version));
-        }
-    }
-
-    fn best(self) -> Option<T> {
-        self.best.map(|(value, _version)| value)
-    }
-}
-
-struct VersionTag<'name> {
-    name: &'name BStr,
-    commit: ObjectId,
-    version: Version,
-}
-
-#[context("downloading the github repository {repository_path}")]
-fn download_github(
-    repository_path: &str,
-    target_version: &VersionRequirement,
+#[context("resolving the version {version} to a commit in the repository at `{repository_url}`")]
+pub(crate) fn resolve_commit(
+    repository_url: &Url,
+    version: &VersionRequirement,
     directories: &RecipeDirectories,
-) -> anyhow::Result<()> {
-    let Some(source_directory) = directories.source()?.as_unpopulated() else {
-        info!("using the cached source");
-        return Ok(());
-    };
-
-    let url = format!("https://github.com/{repository_path}.git");
-
+    state: &State,
+) -> anyhow::Result<ObjectId> {
     let mut progress = Discard;
-    let interrupt = AtomicBool::new(false);
 
-    let repository_directory = directories.repository()?;
+    let repository = repository(directories, repository_url, state)?;
 
-    let repository = if repository_directory.is_populated() {
-        info!("using the cached repository");
-        gix::open(repository_directory.path()).context("opening the cached repository")?
-    } else {
-        gix::init_bare(repository_directory.path())
-            .context("initialising the destination repository")?
-    };
-
-    let remote = repository.remote_at(url).context("adding the remote")?;
+    let remote = repository
+        .remote_at(repository_url.as_str())
+        .context("adding the remote")?;
 
     let connection = remote
         .connect(Direction::Fetch)
@@ -128,7 +74,7 @@ fn download_github(
         .ref_map(&mut progress, ref_map::Options::default())
         .context("fetching references")?;
 
-    let mut best_tag: Option<VersionTag<'_>> = None;
+    let mut resolver = Resolver::from_requirement(version);
 
     for reference in &references.remote_refs {
         let Some((tag_name, commit)) = to_tag(reference) else {
@@ -143,33 +89,52 @@ fn download_github(
             }
         };
 
-        let tag = VersionTag {
-            name: tag_name,
-            commit,
-            version,
-        };
-
-        if tag.version.satisfies(target_version)
-            && best_tag
-                .as_ref()
-                .is_none_or(|best| tag.version > best.version)
-        {
-            best_tag = Some(tag);
-        }
+        resolver.add_option(commit, version);
     }
 
-    let Some(tag) = best_tag else {
-        bail!("could not find a tag matching the version {target_version}");
+    let Some(commit) = resolver.best() else {
+        bail!("could not find a tag matching the version {version}");
     };
 
-    info!(
-        "using version {} which corresponds to commit {}",
-        tag.version, tag.commit
-    );
+    Ok(commit)
+}
 
-    // A ref-spec of only `<tag>` will fetch only said tag into `FETCH_HEAD`.
+fn repository(
+    directories: &RecipeDirectories,
+    url: &Url,
+    state: &State,
+) -> anyhow::Result<Repository> {
+    directories
+        .repository_from_git_url(url, state)?
+        .as_populated_then_try_or_populate_with(
+            |path| {
+                info!("using the cached repository");
+                gix::open(path).context("opening the cached repository")
+            },
+            |path| gix::init(path).context("initialising the git repository"),
+        )
+}
+
+#[context("downloading the git repository at `{url}`")]
+fn download_git(
+    url: &Url,
+    commit: ObjectId,
+    source_directory: &Path,
+    directories: &RecipeDirectories,
+    state: &State,
+) -> anyhow::Result<()> {
+    let interrupt = AtomicBool::new(false);
+    let mut progress = Discard;
+
+    let repository = repository(directories, url, state)?;
+
+    let remote = repository
+        .remote_at(url.as_str())
+        .context("adding the remote")?;
+
+    // A ref-spec of only `<commit>` will fetch only said tag into `FETCH_HEAD`.
     let remote = remote
-        .with_refspecs([tag.name], Direction::Fetch)
+        .with_refspecs([commit.to_string().as_bytes()], Direction::Fetch)
         .context("setting ref-specs")?;
 
     let connection = remote
@@ -184,7 +149,7 @@ fn download_github(
         .context("fetching the repository")?;
 
     let commit = repository
-        .find_commit(tag.commit)
+        .find_commit(commit)
         .context("finding the commit")?;
 
     let tree = commit.tree().context("finding the tree")?;
@@ -250,13 +215,8 @@ fn parse_version(tag_name: &BStr) -> anyhow::Result<Version> {
 fn download_tarball(
     url: &Url,
     compression: Compression,
-    directories: &RecipeDirectories,
+    source_directory: &Path,
 ) -> anyhow::Result<()> {
-    let Some(source_directory) = directories.source()?.as_unpopulated() else {
-        info!("using the cached source");
-        return Ok(());
-    };
-
     let response = reqwest::blocking::get(url.clone())?;
 
     let response = response.error_for_status()?;
@@ -280,38 +240,27 @@ fn download_tarball(
     Ok(())
 }
 
-fn basename_and_compression(url_or_path: &str) -> Option<(&str, Compression)> {
-    let (basename, extension) = url_or_path.rsplit_once(".tar")?;
-
-    if extension.is_empty() {
-        return Some((basename, Compression::None));
-    }
-
-    let extension = extension.strip_prefix(".")?;
+fn basename_and_compression(file_name: &str) -> Option<(&str, Compression)> {
+    let (basename, extension) = file_name.rsplit_once(".tar")?;
 
     if extension.contains('/') {
         return None;
     }
 
-    #[expect(clippy::single_match_else)]
-    let compression = match extension {
-        "xz" => Compression::Xz,
-        _ => {
-            warn!("unknown compression extension: `.{extension}`");
-            return None;
-        }
-    };
+    let extension = extension.strip_prefix(".");
+
+    let compression = Compression::from_extension(extension)?;
 
     Some((basename, compression))
 }
 
-fn detect_compression(url_or_path: &str) -> Option<Compression> {
-    let (_basename, compression) = basename_and_compression(url_or_path)?;
+pub(crate) fn detect_compression(url: &str) -> Option<Compression> {
+    let (_basename, compression) = basename_and_compression(url)?;
     Some(compression)
 }
 
 #[context("finding a file matching version {version} in the index at `{index}`")]
-fn find_in_index(
+pub(crate) fn find_in_index(
     index: &Url,
     version: &VersionRequirement,
     file_name_prefix: &str,
@@ -331,6 +280,7 @@ fn find_in_index(
     // TODO: Set favouring of compression types.
     let mut resolver = Resolver::from_requirement(version);
 
+    // TODO: Sprinkle in some logs.
     for node in dom.nodes() {
         let Node::Tag(tag) = node else {
             continue;

@@ -1,14 +1,14 @@
 use crate::BuildPlan;
 use crate::Manifest;
 use crate::PACKAGE_NAME;
+use crate::Recipe;
 use crate::VersionRequirement;
-use crate::recipe::Recipe;
 use anyhow::Context as _;
 use anyhow::bail;
 use directories::ProjectDirs;
 use fn_error_context::context;
 use fs_err::read_to_string;
-use std::cell::OnceCell;
+use once_cell::unsync::OnceCell;
 use std::path::Path;
 use std::path::PathBuf;
 

@@ -1,25 +1,20 @@
-use crate::RecipeDirectories;
-use crate::recipe::BuildSystem;
-use crate::recipe::Recipe;
+use crate::BuildSystem;
+use crate::Recipe;
+use crate::State;
 use anyhow::Context;
 use anyhow::bail;
 use bstr::ByteSlice;
 use fn_error_context::context;
+use std::path::Path;
 use std::process::Command;
-use tracing::info;
 use tracing::warn;
 
 const CONFIGURE_MAKE_DISTINATION_DIRECTORY: &str = concat!("DEST", "DIR");
 
 #[context("building the `{}` recipe", recipe.name)]
-pub(crate) fn build(recipe: &Recipe, directories: &RecipeDirectories) -> anyhow::Result<()> {
-    let Some(target_directory) = directories.target()?.as_unpopulated() else {
-        info!("using cached target");
-        return Ok(());
-    };
-
-    let build_root = directories.build_root()?;
-    let working_directory = directories.build_working()?;
+pub(crate) fn build(recipe: &Recipe, target_directory: &Path, state: &State) -> anyhow::Result<()> {
+    let build_root = recipe.directories.build_root(recipe, state)?;
+    let working_directory = recipe.directories.build_working(recipe, state)?;
 
     for (dependency, version) in &recipe.build.dependencies.versions {
         warn!("not checking the build dependency of `{dependency}` version {version}");

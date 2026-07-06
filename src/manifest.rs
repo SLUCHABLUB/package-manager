@@ -1,6 +1,6 @@
+use crate::Recipe;
 use crate::ResultExtension as _;
 use crate::VersionRequirement;
-use crate::recipe::Recipe;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;

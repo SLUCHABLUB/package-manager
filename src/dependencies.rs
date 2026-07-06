@@ -1,8 +1,8 @@
 use crate::Ledger;
+use crate::Recipe;
 use crate::ResultExtension as _;
 use crate::Version;
 use crate::VersionRequirement;
-use crate::recipe::Recipe;
 use anyhow::Context;
 use anyhow::bail;
 use fn_error_context::context;

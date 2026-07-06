@@ -1,8 +1,8 @@
 mod arguments;
 mod result;
 
-use crate::arguments::Arguments;
 use anyhow::anyhow;
+use arguments::Arguments;
 use clap::Parser;
 use package_manager::State;
 use result::ResultExtension as _;

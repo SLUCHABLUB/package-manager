@@ -1,27 +1,36 @@
-pub mod recipe;
-
 mod build;
 mod build_plan;
 mod dependencies;
-mod directories;
 mod download;
 mod internal_error;
 mod ledger;
 mod manifest;
 mod prepare_to_install;
+mod recipe;
 mod result;
+mod serde;
 mod state;
 mod version;
 
 pub(crate) use build::build;
 pub(crate) use build_plan::BuildPlan;
-pub(crate) use directories::RecipeDirectories;
+pub(crate) use dependencies::check_runtime_dependencies;
+pub(crate) use download::detect_compression;
 pub(crate) use download::download;
+pub(crate) use download::find_in_index;
+pub(crate) use download::resolve_commit;
 pub(crate) use ledger::Ledger;
 pub(crate) use manifest::Manifest;
 pub(crate) use prepare_to_install::prepare_to_install;
+pub(crate) use recipe::BuildSystem;
+pub(crate) use recipe::CacheDirectory;
+pub(crate) use recipe::Compression;
+pub(crate) use recipe::Dependencies;
+pub(crate) use recipe::DownloadLock;
 pub(crate) use recipe::Recipe;
+pub(crate) use recipe::RecipeDirectories;
 pub(crate) use result::ResultExtension;
+pub(crate) use version::Resolver;
 pub(crate) use version::Version;
 pub(crate) use version::VersionRequirement;
 

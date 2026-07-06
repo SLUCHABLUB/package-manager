@@ -13,7 +13,7 @@ clap = { version = "4.6.1", features = ["derive"] }
 directories = "6.0.0"
 fn-error-context = "0.2.1"
 fs-err = "3.3.0"
-gix = { version = "0.84.0", features = ["blocking-http-transport-reqwest"] }
+gix = { version = "0.84.0", features = ["blocking-http-transport-reqwest", "serde"] }
 goblin = { version = "0.10.7", default-features = false, features = ["std", "elf32", "elf64", "endian_fd"] }
 lzma-rs = "0.3.0"
 non-zero = "0.2.0"

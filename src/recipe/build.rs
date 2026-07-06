@@ -1,4 +1,4 @@
-use crate::recipe::Dependencies;
+use crate::Dependencies;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
