@@ -15,7 +15,7 @@ mod version;
 pub(crate) use build::build;
 pub(crate) use build_plan::BuildPlan;
 pub(crate) use dependencies::check_runtime_dependencies;
-pub(crate) use download::detect_compression;
+pub(crate) use download::detect_tarball_compression;
 pub(crate) use download::download;
 pub(crate) use download::find_in_index;
 pub(crate) use download::resolve_commit;

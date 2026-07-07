@@ -1,7 +1,7 @@
 use crate::RecipeDirectories;
 use crate::State;
 use crate::VersionRequirement;
-use crate::detect_compression;
+use crate::detect_tarball_compression;
 use crate::find_in_index;
 use crate::resolve_commit;
 use anyhow::bail;
@@ -51,7 +51,8 @@ impl Download {
                 DownloadLock::Git { url, commit }
             }
             Download::Tarball { url, compression } => {
-                let Some(compression) = compression.or_else(|| detect_compression(url.as_str()))
+                let Some(compression) =
+                    compression.or_else(|| detect_tarball_compression(url.as_str()))
                 else {
                     bail!("could not detect compression of tarball at `{url}`");
                 };
