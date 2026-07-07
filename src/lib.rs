@@ -32,6 +32,7 @@ pub(crate) use recipe::RecipeDirectories;
 pub(crate) use result::ResultExtension;
 pub(crate) use staging::stage_recipes;
 pub(crate) use version::Resolver;
+pub(crate) use version::SemanticVersion;
 pub(crate) use version::Version;
 pub(crate) use version::VersionRequirement;
 
