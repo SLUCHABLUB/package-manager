@@ -24,6 +24,7 @@ pub(crate) fn build(recipe: &Recipe, target_directory: &Path, state: &State) -> 
 
     let mut commands = Vec::new();
 
+    // TODO: Pass the right prefixes.
     match &recipe.build.system {
         BuildSystem::None => (),
         // TODO: Should we add the version requirement here?
