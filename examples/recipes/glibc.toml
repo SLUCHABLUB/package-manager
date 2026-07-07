@@ -1,6 +1,3 @@
-name = "glibc"
-author = "gnu"
-
 [provides]
 libc = "6"
 libm = "6"

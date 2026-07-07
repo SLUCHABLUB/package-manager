@@ -1,6 +1,3 @@
-name = "libgit2"
-author = "libgit2"
-
 [provides]
 libgit2 = "1.9"
 

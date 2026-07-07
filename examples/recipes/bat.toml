@@ -1,6 +1,3 @@
-name = "bat"
-author = "David Peter"
-
 [download.github]
 repository = "sharkdp/bat"
 version.semantic = "0.26.1"

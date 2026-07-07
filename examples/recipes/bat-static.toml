@@ -1,6 +1,3 @@
-name = "bat-static"
-author = "David Peter"
-
 [provides]
 bat = "0.26.1"
 
