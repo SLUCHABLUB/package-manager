@@ -8,6 +8,7 @@ mod prepare_to_install;
 mod recipe;
 mod result;
 mod serde;
+mod staging;
 mod state;
 mod version;
 
@@ -29,6 +30,7 @@ pub(crate) use recipe::DownloadLock;
 pub(crate) use recipe::Recipe;
 pub(crate) use recipe::RecipeDirectories;
 pub(crate) use result::ResultExtension;
+pub(crate) use staging::stage_recipes;
 pub(crate) use version::Resolver;
 pub(crate) use version::Version;
 pub(crate) use version::VersionRequirement;

@@ -8,7 +8,9 @@ use anyhow::bail;
 use directories::ProjectDirs;
 use fn_error_context::context;
 use fs_err::read_to_string;
+use fs_err::remove_dir_all;
 use once_cell::unsync::OnceCell;
+use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -35,8 +37,17 @@ impl State {
         })
     }
 
-    pub fn prepare_to_install(&self) -> anyhow::Result<()> {
-        self.build_plan()?.prepare_to_install()
+    pub fn stage(&self) -> anyhow::Result<()> {
+        // TODO: Base this on the install location.
+        let staging = self.directories.data_dir().join("staging");
+
+        match remove_dir_all(&staging) {
+            Ok(()) => (),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => (),
+            result @ Err(_) => result?,
+        }
+
+        self.build_plan()?.stage(&staging)
     }
 
     fn recipes(&self) -> impl Iterator<Item = &Recipe> {

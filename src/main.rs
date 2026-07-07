@@ -24,7 +24,7 @@ fn try_main(arguments: Arguments) -> anyhow::Result<()> {
 
     let state = State::initialise(&arguments.manifest)?;
 
-    state.prepare_to_install()?;
+    state.stage()?;
 
     Ok(())
 }

@@ -10,6 +10,7 @@ pub(crate) use download::Compression;
 pub(crate) use download::Download;
 pub(crate) use download::DownloadLock;
 
+use crate::Ledger;
 use crate::State;
 use crate::Version;
 use crate::VersionRequirement;
@@ -25,6 +26,7 @@ use serde_with::serde_as;
 use std::collections::HashMap;
 use std::path::Path;
 
+// TODO: Split this into a "simple" and "cached" type.
 // TODO: Make this opaque.
 #[serde_as]
 #[derive(Debug, Serialize, Deserialize)]
@@ -47,6 +49,8 @@ pub(crate) struct Recipe {
     pub download_lock: OnceCell<DownloadLock>,
     #[serde(default)]
     pub directories: RecipeDirectories,
+    #[serde(default, with = "once_cell_as_option")]
+    pub ledger: OnceCell<Ledger>,
 }
 
 impl Recipe {
@@ -63,6 +67,9 @@ impl Recipe {
 
         if recipe.download_lock.get().is_some() {
             bail!("a normal recipe may not provide a download lock");
+        }
+        if recipe.ledger.get().is_some() {
+            bail!("a normal recipe may not provide a ledger");
         }
 
         recipe.name = Box::from(file_name);

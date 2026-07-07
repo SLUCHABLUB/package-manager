@@ -9,10 +9,11 @@ use tracing::info;
 pub(crate) fn prepare_to_install<'state>(
     recipe: &'state Recipe,
     state: &'state State,
-) -> anyhow::Result<Ledger> {
+) -> anyhow::Result<()> {
     let name = &recipe.name;
     let directories = &recipe.directories;
 
+    // TODO: Don't download if the target is populated.
     directories
         .source(recipe.download_lock(state)?, state)?
         .as_populated_then_run_or_populate_with(
@@ -37,15 +38,17 @@ pub(crate) fn prepare_to_install<'state>(
             },
         )?;
 
-    let ledger = Ledger::new(recipe, state)?;
+    let ledger = recipe
+        .ledger
+        .get_or_try_init(|| Ledger::new(recipe, state))?;
 
     check_runtime_dependencies(
-        &ledger,
+        ledger,
         recipe.directories.target(recipe, state)?.path(),
         recipe,
     )?;
 
     info!("the `{}` recipe is ready to install", recipe.name);
 
-    Ok(ledger)
+    Ok(())
 }

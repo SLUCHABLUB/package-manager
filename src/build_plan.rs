@@ -2,7 +2,9 @@ use crate::Recipe;
 use crate::State;
 use crate::VersionRequirement;
 use crate::prepare_to_install;
+use crate::stage_recipes;
 use fn_error_context::context;
+use std::path::Path;
 
 /// A set of recipes to be installed.
 pub(crate) struct BuildPlan<'state> {
@@ -50,6 +52,13 @@ impl<'state> BuildPlan<'state> {
         for recipe in &self.recipes {
             prepare_to_install(recipe, self.state)?;
         }
+
+        Ok(())
+    }
+
+    pub(crate) fn stage(&self, into: &Path) -> anyhow::Result<()> {
+        self.prepare_to_install()?;
+        stage_recipes(&self.recipes, into, self.state)?;
 
         Ok(())
     }
