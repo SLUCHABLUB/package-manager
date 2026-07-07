@@ -8,9 +8,6 @@ version.semantic = "0.26.1"
 [build]
 system = "cargo"
 
-[bild.environment_variables]
-libgit2_STATIC = "yes please"
-
 [dependencies]
 libgcc_s.exact = "1"
 libm.exact = "6"

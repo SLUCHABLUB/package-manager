@@ -13,9 +13,13 @@ use serde::Deserializer;
 use serde::Serialize;
 use std::fmt;
 use std::fmt::Debug;
+use std::hash::DefaultHasher;
+use std::hash::Hash;
+use std::hash::Hasher as _;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
+use tracing::warn;
 use url::Url;
 
 macro_rules! concat_paths {
@@ -109,16 +113,14 @@ impl RecipeDirectories {
                     return Ok(CacheDirectory::empty());
                 }
                 DownloadLock::Git { url, commit } => {
-                    path.push("git");
-                    path.push(&*urlencoding::encode(url.as_str()));
+                    path.push(encode_url(url));
                     path.push(commit.to_string());
                 }
                 DownloadLock::Tarball {
                     url,
                     compression: _,
                 } => {
-                    path.push("tarball");
-                    path.push(&*urlencoding::encode(url.as_str()));
+                    path.push(encode_url(url));
                 }
             }
 
@@ -134,12 +136,30 @@ impl RecipeDirectories {
         self.repository.get_or_try_init(|| {
             let mut path = state.cache_directory().join("repositories");
 
-            path.push("git");
-            path.push(&*urlencoding::encode(url.as_str()));
+            path.push(encode_url(url));
+            path.add_extension("git");
 
             CacheDirectory::new(path)
         })
     }
+}
+
+fn encode_url(url: &Url) -> String {
+    let human_readable_prefix = url
+        .path_segments()
+        .and_then(Iterator::last)
+        .or_else(|| url.domain())
+        .unwrap_or_else(|| {
+            warn!("could not retrieve a human readable component from the `{url}` url");
+            "weird-url"
+        });
+
+    let mut hasher = DefaultHasher::new();
+    url.as_str().hash(&mut hasher);
+
+    let injection_factor = hasher.finish();
+
+    format!("{human_readable_prefix}-{injection_factor}")
 }
 
 fn make_empty_directory(directory: &Path) -> anyhow::Result<()> {
