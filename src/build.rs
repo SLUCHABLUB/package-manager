@@ -94,7 +94,7 @@ pub(crate) fn build(recipe: &Recipe, target_directory: &Path, state: &State) -> 
                 "the `{}` command failed with {}\nfull command:\n{:?}\nstandard output:\n{}\nstandard error:\n{}",
                 command.get_program().display(),
                 output.status,
-                &command,
+                command,
                 output.stdout.as_bstr(),
                 output.stderr.as_bstr(),
             )
