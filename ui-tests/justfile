@@ -3,6 +3,9 @@ ui_tests_directory := justfile_directory()
 test-all:
     @just test bat-gnu
 
+clean-all:
+    @just clean bat-gnu
+
 test directory:
     XDG_BIN_HOME="{{ ui_tests_directory }}/{{ directory }}/bin" \
     XDG_CACHE_HOME="{{ ui_tests_directory }}/{{ directory }}/cache" \
@@ -11,3 +14,9 @@ test directory:
     XDG_STATE_HOME='{{ ui_tests_directory }}/{{ directory }}/state' \
     RUST_BACKTRACE=1 \
     cargo run -- install
+
+clean directory:
+    rm -rf "{{ ui_tests_directory }}/{{ directory }}/bin"
+    rm -rf "{{ ui_tests_directory }}/{{ directory }}/cache"
+    rm -rf "{{ ui_tests_directory }}/{{ directory }}/data"
+    rm -rf "{{ ui_tests_directory }}/{{ directory }}/state"
