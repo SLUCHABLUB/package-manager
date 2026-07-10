@@ -1,6 +1,10 @@
-use std::path::Path;
-
 #[derive(clap::Parser)]
 pub(crate) struct Arguments {
-    pub manifest: Box<Path>,
+    #[clap(subcommand)]
+    pub action: Action,
+}
+
+#[derive(clap::Subcommand)]
+pub(crate) enum Action {
+    Install,
 }

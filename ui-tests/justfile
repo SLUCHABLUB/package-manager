@@ -1,0 +1,13 @@
+ui_tests_directory := justfile_directory()
+
+test-all:
+    @just test bat-gnu
+
+test directory:
+    XDG_BIN_HOME="{{ ui_tests_directory }}/{{ directory }}/bin" \
+    XDG_CACHE_HOME="{{ ui_tests_directory }}/{{ directory }}/cache" \
+    XDG_CONFIG_HOME="{{ ui_tests_directory }}/{{ directory }}/config" \
+    XDG_DATA_HOME='{{ ui_tests_directory }}/{{ directory }}/data' \
+    XDG_STATE_HOME='{{ ui_tests_directory }}/{{ directory }}/state' \
+    RUST_BACKTRACE=1 \
+    cargo run -- install

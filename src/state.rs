@@ -7,7 +7,6 @@ use anyhow::Context as _;
 use anyhow::bail;
 use directories::ProjectDirs;
 use fn_error_context::context;
-use fs_err::read_to_string;
 use fs_err::remove_dir_all;
 use once_cell::unsync::OnceCell;
 use std::io;
@@ -23,12 +22,11 @@ pub struct State {
 
 impl State {
     #[context("initialising the package manager state")]
-    pub fn initialise(manifest: &Path) -> anyhow::Result<State> {
-        let manifest = read_to_string(manifest)?;
-        let manifest = toml::from_str(&manifest)?;
-
+    pub fn initialise() -> anyhow::Result<State> {
         let directories = ProjectDirs::from_path(PathBuf::from(PACKAGE_NAME))
             .context("determining project directories")?;
+
+        let manifest = Manifest::read_from(directories.config_dir().join("manifest.toml"))?;
 
         Ok(State {
             main_manifest: manifest,

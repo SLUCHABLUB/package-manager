@@ -2,6 +2,7 @@ use crate::Compression;
 use anyhow::Context as _;
 use fn_error_context::context;
 use lzma_rs::xz_decompress;
+use reqwest::blocking::ClientBuilder;
 use std::io::Cursor;
 use std::path::Path;
 use tar::Archive;
@@ -13,7 +14,12 @@ pub(in crate::download) fn download_tarball(
     compression: Compression,
     source_directory: &Path,
 ) -> anyhow::Result<()> {
-    let response = reqwest::blocking::get(url.clone())?;
+    let client = ClientBuilder::new()
+        .timeout(None)
+        .build()
+        .context("initialising the http client")?;
+
+    let response = client.get(url.clone()).send()?;
 
     let response = response.error_for_status()?;
 

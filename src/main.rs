@@ -22,7 +22,11 @@ fn try_main(arguments: Arguments) -> anyhow::Result<()> {
         .install_default()
         .map_err(|_provider| anyhow!("failed to set the rustls cryptography provider"))?;
 
-    let state = State::initialise(&arguments.manifest)?;
+    match arguments.action {
+        arguments::Action::Install => (),
+    }
+
+    let state = State::initialise()?;
 
     state.stage()?;
 

@@ -1,3 +1,5 @@
+# TODO: Check that a provider provides the needed package.
+
 [download.github]
 repository = "sharkdp/bat"
 version.semantic = "0.26.1"

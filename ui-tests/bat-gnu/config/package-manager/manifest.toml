@@ -1,0 +1,7 @@
+recipe_directories = ["../../../recipes"]
+
+[packages]
+bat = "any"
+
+[providers]
+bat = "bat-gnu"
