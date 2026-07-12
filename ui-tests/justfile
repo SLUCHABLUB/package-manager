@@ -6,17 +6,25 @@ test-all:
 clean-all:
     @just clean bat-gnu
 
-test directory:
-    XDG_BIN_HOME="{{ ui_tests_directory }}/{{ directory }}/bin" \
-    XDG_CACHE_HOME="{{ ui_tests_directory }}/{{ directory }}/cache" \
-    XDG_CONFIG_HOME="{{ ui_tests_directory }}/{{ directory }}/config" \
+with-home directory +command:
+    HOME='{{ ui_tests_directory }}/{{ directory }}' \
+    XDG_BIN_HOME='{{ ui_tests_directory }}/{{ directory }}/executables' \
+    XDG_CACHE_HOME='{{ ui_tests_directory }}/{{ directory }}/cache' \
+    XDG_CONFIG_HOME='{{ ui_tests_directory }}/{{ directory }}/configuration' \
     XDG_DATA_HOME='{{ ui_tests_directory }}/{{ directory }}/data' \
     XDG_STATE_HOME='{{ ui_tests_directory }}/{{ directory }}/state' \
-    RUST_BACKTRACE=1 \
-    cargo run -- install
+    {{ command }}
+
+test directory:
+    cargo build
+
+    @just with-home '{{ directory }}' \
+    '{{ ui_tests_directory }}/../target/debug/package-manager' install
+
+    ! test -d '{{ ui_tests_directory }}/{{ directory }}/.local'
 
 clean directory:
-    rm -rf "{{ ui_tests_directory }}/{{ directory }}/bin"
+    rm -rf "{{ ui_tests_directory }}/{{ directory }}/executables"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/cache"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/data"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/state"
