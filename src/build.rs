@@ -1,6 +1,7 @@
 use crate::BuildSystem;
 use crate::Recipe;
 use crate::State;
+use crate::recipe::Build;
 use anyhow::Context;
 use anyhow::bail;
 use bstr::ByteSlice;
@@ -17,15 +18,22 @@ pub(crate) fn build(recipe: &Recipe, target_directory: &Path, state: &State) -> 
     let working_directory = recipe.directories.build_working(recipe, state)?;
 
     for (dependency, version) in &recipe.build.dependencies.versions {
+        // TODO
         warn!("not checking the build dependency of `{dependency}` version {version}");
     }
 
-    warn!("not sand-boxing the build");
+    let mut commands = generate_commands(&recipe.build, build_root, target_directory);
 
+    run_commands(&mut commands, working_directory)?;
+
+    Ok(())
+}
+
+fn generate_commands(build: &Build, build_root: &Path, target_directory: &Path) -> Vec<Command> {
     let mut commands = Vec::new();
 
     // TODO: Pass the right prefixes.
-    match &recipe.build.system {
+    match &build.system {
         BuildSystem::None => (),
         // TODO: Should we add the version requirement here?
         // TODO: Should we specify the binary?
@@ -73,12 +81,19 @@ pub(crate) fn build(recipe: &Recipe, target_directory: &Path, state: &State) -> 
     }
 
     for command in &mut commands {
-        for (key, value) in &recipe.build.environment_variables {
+        for (key, value) in &build.environment_variables {
             command.env(&**key, &**value);
         }
     }
 
-    for command in &mut commands {
+    commands
+}
+
+// TODO: Add a sandbox parameter.
+fn run_commands(commands: &mut [Command], working_directory: &Path) -> anyhow::Result<()> {
+    warn!("not sand-boxing the build");
+
+    for command in commands {
         command.current_dir(working_directory);
 
         let output = command.output().with_context(|| {
