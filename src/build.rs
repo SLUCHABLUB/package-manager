@@ -6,11 +6,33 @@ use anyhow::Context;
 use anyhow::bail;
 use bstr::ByteSlice;
 use fn_error_context::context;
+use fs_err as fs;
+use std::env::home_dir;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 use tracing::warn;
 
+// TODO: Create HostPath and TargetPath wrapper structs.
+
 const CONFIGURE_MAKE_DISTINATION_DIRECTORY: &str = concat!("DEST", "DIR");
+
+struct BuildInstruction<'data> {
+    commands: Vec<Command>,
+    working_directory: &'data Path,
+
+    copies: Vec<FileTransfer<PathBuf, PathBuf>>,
+}
+
+struct FileTransfer<FromPath, ToPath> {
+    from: FromPath,
+    to: ToPath,
+}
+
+#[derive(Copy, Clone)]
+enum Sandbox {
+    None,
+}
 
 #[context("building the `{}` recipe", recipe.name)]
 pub(crate) fn build(recipe: &Recipe, target_directory: &Path, state: &State) -> anyhow::Result<()> {
@@ -22,15 +44,42 @@ pub(crate) fn build(recipe: &Recipe, target_directory: &Path, state: &State) -> 
         warn!("not checking the build dependency of `{dependency}` version {version}");
     }
 
-    let mut commands = generate_commands(&recipe.build, build_root, target_directory);
+    // TODO: Generate this from `recipe.install`.
+    let mut copies = Vec::new();
 
-    run_commands(&mut commands, working_directory)?;
+    let commands = generate_commands(
+        &recipe.build,
+        build_root,
+        working_directory,
+        target_directory,
+        &mut copies,
+    );
+
+    let instruction = BuildInstruction {
+        commands,
+        working_directory,
+        copies: Vec::new(),
+    };
+
+    // TODO: Base the sandbox on the manifest.
+    build_in_sandbox(instruction, Sandbox::None)?;
 
     Ok(())
 }
 
-fn generate_commands(build: &Build, build_root: &Path, target_directory: &Path) -> Vec<Command> {
+// TODO: Fix this parameter hazard.
+fn generate_commands(
+    build: &Build,
+    build_root: &Path,
+    working_directory: &Path,
+    target_directory: &Path,
+    copies: &mut Vec<FileTransfer<PathBuf, PathBuf>>,
+) -> Vec<Command> {
     let mut commands = Vec::new();
+
+    // TODO: Don't hardcode this.
+    // TODO: Get this PESKY unwrap the heck outta here.
+    let executables_prefix = home_dir().unwrap().join(".local/bin");
 
     // TODO: Pass the right prefixes.
     match &build.system {
@@ -38,15 +87,24 @@ fn generate_commands(build: &Build, build_root: &Path, target_directory: &Path) 
         // TODO: Should we add the version requirement here?
         // TODO: Should we specify the binary?
         // TODO: --message-format json to get better logs?
-        BuildSystem::Cargo { features, target } => {
+        BuildSystem::Cargo {
+            binary,
+            features,
+            target,
+        } => {
+            let cargo_target_directory = working_directory.join("target");
+
             let mut cargo = Command::new("cargo");
             cargo
-                .arg("install")
+                .arg("build")
+                .arg("--bin")
+                .arg(&**binary)
+                .arg("--locked")
+                .arg("--release")
                 .arg("--path")
                 .arg(build_root)
-                .arg("--no-track")
-                .arg("--root")
-                .arg(target_directory);
+                .arg("--target")
+                .arg(&cargo_target_directory);
 
             if !features.is_empty() {
                 cargo.arg("--features").arg(features.join(" "));
@@ -55,6 +113,15 @@ fn generate_commands(build: &Build, build_root: &Path, target_directory: &Path) 
             if let Some(target) = target {
                 cargo.arg("--target").arg(&**target);
             }
+
+            // TODO: Use `--artefact-dir` when it gets stabilised.
+            let artefact_path = cargo_target_directory.join("release").join(&**binary);
+            let artefact_target_path = executables_prefix.join(&**binary);
+
+            copies.push(FileTransfer {
+                from: artefact_path,
+                to: artefact_target_path,
+            });
 
             commands.push(cargo);
         }
@@ -90,11 +157,15 @@ fn generate_commands(build: &Build, build_root: &Path, target_directory: &Path) 
 }
 
 // TODO: Add a sandbox parameter.
-fn run_commands(commands: &mut [Command], working_directory: &Path) -> anyhow::Result<()> {
+fn build_in_sandbox(mut instruction: BuildInstruction, sandbox: Sandbox) -> anyhow::Result<()> {
+    match sandbox {
+        Sandbox::None => (),
+    }
+
     warn!("not sand-boxing the build");
 
-    for command in commands {
-        command.current_dir(working_directory);
+    for command in &mut instruction.commands {
+        command.current_dir(instruction.working_directory);
 
         let output = command.output().with_context(|| {
             format!(
@@ -114,6 +185,10 @@ fn run_commands(commands: &mut [Command], working_directory: &Path) -> anyhow::R
                 output.stderr.as_bstr(),
             )
         }
+    }
+
+    for copy in instruction.copies {
+        fs::copy(copy.from, copy.to)?;
     }
 
     Ok(())

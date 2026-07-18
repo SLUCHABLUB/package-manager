@@ -28,6 +28,10 @@ pub(crate) enum BuildSystem {
         // TODO: profile: Box<str>,
         // TODO: no-default-features: bool,
         // TODO: bins/examples
+
+        // TODO: Allow the user to specify multiple binaries or examples.
+        binary: Box<str>,
+
         #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
         features: Box<[Box<str>]>,
         target: Option<Box<str>>,

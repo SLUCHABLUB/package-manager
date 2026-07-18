@@ -7,3 +7,4 @@ version.semantic = "0.26.1"
 
 [build]
 system = "cargo"
+binary = "bat"

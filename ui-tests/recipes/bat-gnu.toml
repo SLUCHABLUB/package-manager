@@ -6,6 +6,7 @@ version.semantic = "0.26.1"
 
 [build]
 system = "cargo"
+binary = "bat"
 
 [dependencies]
 libgit2.exact = "1.9"

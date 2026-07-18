@@ -4,3 +4,4 @@ version = "any"
 
 [build]
 system = "cargo"
+binary = "package-manager"
