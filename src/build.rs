@@ -19,6 +19,7 @@ use tracing::warn;
 
 const CONFIGURE_MAKE_DISTINATION_DIRECTORY: &str = concat!("DEST", "DIR");
 
+#[derive(Debug)]
 struct BuildInstruction<'data> {
     commands: Vec<Command>,
     working_directory: &'data Path,
@@ -26,6 +27,7 @@ struct BuildInstruction<'data> {
     copies: Vec<FileTransfer<PathBuf, PathBuf>>,
 }
 
+#[derive(Debug)]
 struct FileTransfer<FromPath, ToPath> {
     from: FromPath,
     to: ToPath,
@@ -60,7 +62,7 @@ pub(crate) fn build(recipe: &Recipe, target_directory: &Path, state: &State) -> 
     let instruction = BuildInstruction {
         commands,
         working_directory,
-        copies: Vec::new(),
+        copies,
     };
 
     // TODO: Base the sandbox on the manifest.
@@ -116,7 +118,14 @@ fn generate_commands(
             }
 
             let artefact_path = cargo_target_directory.join("release").join(&**binary);
-            let artefact_target_path = target_directories.executables.join(&**binary);
+            // TODO: Unshitify this expression when we have proper types.
+            let artefact_target_path = target_directory.join(
+                target_directories
+                    .executables
+                    .join(&**binary)
+                    .strip_prefix("/")
+                    .context("stripping `/`-prefix from an absolute path")?,
+            );
 
             copies.push(FileTransfer {
                 from: artefact_path,
@@ -214,6 +223,9 @@ fn build_in_sandbox(mut instruction: BuildInstruction, sandbox: Sandbox) -> anyh
     }
 
     for copy in instruction.copies {
+        if let Some(parent) = copy.to.parent() {
+            fs::create_dir_all(parent)?;
+        }
         fs::copy(copy.from, copy.to)?;
     }
 
