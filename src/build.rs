@@ -8,6 +8,8 @@ use anyhow::bail;
 use bstr::ByteSlice;
 use fn_error_context::context;
 use fs_err as fs;
+use std::ffi::OsStr;
+use std::ffi::OsString;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -127,6 +129,26 @@ fn generate_commands(
             let cpu_count = num_cpus::get();
 
             let mut configure = Command::new(build_root.join("configure"));
+
+            configure.arg(concat_os("--prefix=", &target_directories.prefix));
+            configure.arg(concat_os("--bindir=", &target_directories.executables));
+            // TODO: Maybe set "sbindir"?
+            configure.arg(concat_os(
+                "--libexecdir=",
+                &target_directories.internal_executables,
+            ));
+            configure.arg(concat_os("--datarootdir=", &target_directories.data));
+            configure.arg(concat_os("--datadir=", &target_directories.data));
+            configure.arg(concat_os(
+                "--sysconfdir=",
+                &target_directories.configuration,
+            ));
+            configure.arg(concat_os("--sharedstatedir=", &target_directories.state));
+            configure.arg(concat_os("--localstatedir=", &target_directories.state));
+            configure.arg(concat_os("--runstatedir=", &target_directories.runtime));
+            configure.arg(concat_os("--includedir=", &target_directories.headers));
+            configure.arg(concat_os("--libdir=", &target_directories.libraries));
+
             for flag in configure_flags {
                 configure.arg(&**flag);
             }
@@ -152,6 +174,12 @@ fn generate_commands(
     }
 
     Ok(commands)
+}
+
+fn concat_os(prefix: &str, suffix: impl AsRef<OsStr>) -> OsString {
+    let mut string = OsString::from(prefix);
+    string.push(suffix);
+    string
 }
 
 // TODO: Add a sandbox parameter.
