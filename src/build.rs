@@ -1,4 +1,5 @@
 use crate::BuildSystem;
+use crate::Directories;
 use crate::Recipe;
 use crate::State;
 use crate::recipe::Build;
@@ -7,7 +8,6 @@ use anyhow::bail;
 use bstr::ByteSlice;
 use fn_error_context::context;
 use fs_err as fs;
-use std::env::home_dir;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -53,7 +53,7 @@ pub(crate) fn build(recipe: &Recipe, target_directory: &Path, state: &State) -> 
         working_directory,
         target_directory,
         &mut copies,
-    );
+    )?;
 
     let instruction = BuildInstruction {
         commands,
@@ -74,12 +74,10 @@ fn generate_commands(
     working_directory: &Path,
     target_directory: &Path,
     copies: &mut Vec<FileTransfer<PathBuf, PathBuf>>,
-) -> Vec<Command> {
+) -> anyhow::Result<Vec<Command>> {
     let mut commands = Vec::new();
 
-    // TODO: Don't hardcode this.
-    // TODO: Get this PESKY unwrap the heck outta here.
-    let executables_prefix = home_dir().unwrap().join(".local/bin");
+    let target_directories = Directories::user()?;
 
     // TODO: Pass the right prefixes.
     match &build.system {
@@ -92,6 +90,7 @@ fn generate_commands(
             features,
             target,
         } => {
+            let cargo_manifest_path = build_root.join("Cargo.toml");
             let cargo_target_directory = working_directory.join("target");
 
             let mut cargo = Command::new("cargo");
@@ -101,9 +100,9 @@ fn generate_commands(
                 .arg(&**binary)
                 .arg("--locked")
                 .arg("--release")
-                .arg("--path")
-                .arg(build_root)
-                .arg("--target")
+                .arg("--manifest-path")
+                .arg(cargo_manifest_path)
+                .arg("--target-dir")
                 .arg(&cargo_target_directory);
 
             if !features.is_empty() {
@@ -114,9 +113,8 @@ fn generate_commands(
                 cargo.arg("--target").arg(&**target);
             }
 
-            // TODO: Use `--artefact-dir` when it gets stabilised.
             let artefact_path = cargo_target_directory.join("release").join(&**binary);
-            let artefact_target_path = executables_prefix.join(&**binary);
+            let artefact_target_path = target_directories.executables.join(&**binary);
 
             copies.push(FileTransfer {
                 from: artefact_path,
@@ -153,7 +151,7 @@ fn generate_commands(
         }
     }
 
-    commands
+    Ok(commands)
 }
 
 // TODO: Add a sandbox parameter.

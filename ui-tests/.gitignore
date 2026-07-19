@@ -2,3 +2,7 @@
 */cache
 */data
 */state
+
+# TODO: Figure out how to handle this.
+*/.cargo
+*/.rustup

@@ -27,6 +27,7 @@ pub(crate) enum BuildSystem {
         // TODO: locked: bool,
         // TODO: profile: Box<str>,
         // TODO: no-default-features: bool,
+        // TODO: toolchain: Box<str>,
         // TODO: bins/examples
 
         // TODO: Allow the user to specify multiple binaries or examples.
