@@ -1,5 +1,6 @@
 use crate::Version;
 use crate::VersionRequirement;
+use tracing::warn;
 
 pub(crate) struct Resolver<'requirement, T> {
     requirement: &'requirement VersionRequirement,
@@ -15,12 +16,15 @@ impl<T> Resolver<'_, T> {
     }
 
     pub(crate) fn add_option(&mut self, value: T, version: Version) {
-        // TODO: Warn if we cannot compare versions.
         if version.satisfies(self.requirement)
-            && self
-                .best
-                .as_ref()
-                .is_none_or(|(_value, best_version)| version > *best_version)
+            && self.best.as_ref().is_none_or(|(_value, best_version)| {
+                if let Some(ordering) = PartialOrd::partial_cmp(&version, best_version) {
+                    ordering.is_gt()
+                } else {
+                    warn!("could not compare the versions `{version}` and `{best_version}`");
+                    false
+                }
+            })
         {
             self.best = Some((value, version));
         }
