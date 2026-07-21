@@ -15,8 +15,6 @@ use std::path::Path;
 use std::process::Command;
 use tracing::warn;
 
-// TODO: Create HostPath and TargetPath wrapper structs.
-
 const CONFIGURE_MAKE_DISTINATION_DIRECTORY: &str = concat!("DEST", "DIR");
 
 #[derive(Debug)]
