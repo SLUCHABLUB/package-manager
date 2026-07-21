@@ -116,9 +116,11 @@ impl RecipeDirectories {
                     buffer.push(commit.to_string());
                 }
                 DownloadLock::Tarball {
-                    url,
+                    virtual_url,
                     compression: _,
+                    real_url,
                 } => {
+                    let url = virtual_url.as_ref().unwrap_or(real_url);
                     buffer.push(encode_url(url));
                 }
             }

@@ -12,18 +12,25 @@ use tl::ParserOptions;
 use tracing::info;
 use url::Url;
 
+pub(crate) struct IndexedFile {
+    pub real_url: Url,
+    pub virtual_url: Option<Url>,
+    pub compression: Compression,
+}
+
 #[context("finding a file matching version {version} in the index at `{index}`")]
 pub(crate) fn find_in_index(
     index: &Url,
     version: &VersionRequirement,
     file_name_prefix: &str,
-) -> anyhow::Result<(Url, Compression)> {
+) -> anyhow::Result<IndexedFile> {
     let response = reqwest::blocking::get(index.clone())?;
 
     let response = response.error_for_status()?;
 
     // We may get redirected.
     let resolved_index = response.url().clone();
+    let virtual_index = (resolved_index != *index).then_some(index);
 
     let bytes = response.bytes()?;
     let string = from_utf8(&bytes).context("parsing the HTML as UTF-8")?;
@@ -48,6 +55,7 @@ pub(crate) fn find_in_index(
         };
 
         let Ok(file_name) = from_utf8(file_name.as_bytes()) else {
+            // This should be unreachable since we pass in utf-8...
             continue;
         };
 
@@ -65,14 +73,23 @@ pub(crate) fn find_in_index(
     }
 
     let Some((file_name, compression)) = resolver.best() else {
-        bail!("found file matching version {version}");
+        bail!("no file matching version {version} was found");
     };
 
-    let url = resolved_index
+    let real_url = resolved_index
         .join(file_name)
         .context("joining the file name to the index url")?;
 
-    info!("resolved index `{index}` with version {version} to `{url}`");
+    let virtual_url = virtual_index
+        .map(|index| index.join(file_name))
+        .transpose()
+        .context("joining the file name to the index url")?;
 
-    Ok((url, compression))
+    info!("resolved index `{index}` with version {version} to `{real_url}`");
+
+    Ok(IndexedFile {
+        real_url,
+        virtual_url,
+        compression,
+    })
 }

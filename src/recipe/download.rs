@@ -1,3 +1,4 @@
+use crate::IndexedFile;
 use crate::RecipeDirectories;
 use crate::State;
 use crate::VersionRequirement;
@@ -58,7 +59,8 @@ impl Download {
                 };
 
                 DownloadLock::Tarball {
-                    url: url.clone(),
+                    real_url: url.clone(),
+                    virtual_url: None,
                     compression,
                 }
             }
@@ -67,12 +69,15 @@ impl Download {
                 version,
                 file_name_prefix,
             } => {
-                let (real_url, compression) = find_in_index(url, version, file_name_prefix)?;
-
-                // TODO: Figure out the "virtual" url and lock that one.
+                let IndexedFile {
+                    real_url,
+                    virtual_url,
+                    compression,
+                } = find_in_index(url, version, file_name_prefix)?;
 
                 DownloadLock::Tarball {
-                    url: real_url,
+                    real_url,
+                    virtual_url,
                     compression,
                 }
             }
@@ -100,6 +105,13 @@ impl Compression {
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) enum DownloadLock {
     None,
-    Git { url: Url, commit: ObjectId },
-    Tarball { url: Url, compression: Compression },
+    Git {
+        url: Url,
+        commit: ObjectId,
+    },
+    Tarball {
+        real_url: Url,
+        virtual_url: Option<Url>,
+        compression: Compression,
+    },
 }

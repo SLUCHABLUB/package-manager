@@ -18,6 +18,7 @@ pub(crate) use build::ensure_built;
 pub(crate) use build_plan::BuildPlan;
 pub(crate) use dependencies::check_runtime_dependencies;
 pub(crate) use directories::Directories;
+pub(crate) use download::IndexedFile;
 pub(crate) use download::detect_tarball_compression;
 pub(crate) use download::ensure_downloaded;
 pub(crate) use download::find_in_index;
