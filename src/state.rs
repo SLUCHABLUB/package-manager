@@ -1,4 +1,5 @@
 use crate::BuildPlan;
+use crate::HostPath;
 use crate::Manifest;
 use crate::PACKAGE_NAME;
 use crate::Recipe;
@@ -10,7 +11,6 @@ use fn_error_context::context;
 use fs_err::remove_dir_all;
 use once_cell::unsync::OnceCell;
 use std::io;
-use std::path::Path;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -35,11 +35,16 @@ impl State {
         })
     }
 
+    /// Downloads, builds and stages all packages.
+    #[expect(clippy::missing_panics_doc, reason = "this should never panic")]
     pub fn stage(&self) -> anyhow::Result<()> {
         // TODO: Base this on the install location.
-        let staging = self.directories.data_dir().join("staging");
+        // The `directories` crate has already checked that the path is absolute.
+        let staging = HostPath::new(self.directories.data_dir())
+            .expect("the data directory should be absolute")
+            .with_suffix("staging");
 
-        match remove_dir_all(&staging) {
+        match remove_dir_all(&*staging) {
             Ok(()) => (),
             Err(error) if error.kind() == io::ErrorKind::NotFound => (),
             result @ Err(_) => result?,
@@ -105,7 +110,9 @@ impl State {
         Ok(plan)
     }
 
-    pub(crate) fn cache_directory(&self) -> &Path {
-        self.directories.cache_dir()
+    pub(crate) fn cache_directory(&self) -> &HostPath {
+        // The `directories` crate has already checked that this is absolute
+        HostPath::new(self.directories.cache_dir())
+            .expect("the cache directory path should be absolute")
     }
 }

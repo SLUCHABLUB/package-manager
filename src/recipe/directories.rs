@@ -1,4 +1,5 @@
 use crate::DownloadLock;
+use crate::HostPath;
 use crate::Recipe;
 use crate::State;
 use crate::serde::once_cell_as_option;
@@ -22,18 +23,6 @@ use std::path::PathBuf;
 use tracing::warn;
 use url::Url;
 
-macro_rules! concat_paths {
-    ($($path:expr),*) => {
-        ::std::iter::Iterator::collect::<::std::path::PathBuf>(
-            <[&::std::path::Path; _]>::into_iter([
-                $(
-                    ::std::convert::AsRef::<::std::path::Path>::as_ref($path),
-                )*
-            ])
-        )
-    };
-}
-
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub(crate) struct RecipeDirectories {
     /// The path to the (to be) built package tree.
@@ -41,10 +30,10 @@ pub(crate) struct RecipeDirectories {
     target: OnceCell<CacheDirectory>,
     /// The path to the working directory of the build.
     #[serde(with = "once_cell_as_option")]
-    build_working: OnceCell<PathBuf>,
+    build_working: OnceCell<Box<HostPath>>,
     /// The path to the root of the build if it differs from the source codes root.
     #[serde(with = "once_cell_as_option")]
-    build_root: OnceCell<Option<PathBuf>>,
+    build_root: OnceCell<Option<Box<HostPath>>>,
     /// The path to the source code.
     #[serde(with = "once_cell_as_option")]
     source: OnceCell<CacheDirectory>,
@@ -57,26 +46,35 @@ impl RecipeDirectories {
     pub(crate) fn target(&self, recipe: &Recipe, state: &State) -> anyhow::Result<&CacheDirectory> {
         // TODO: Base this on the recipe hash.
         self.target.get_or_try_init(|| {
-            CacheDirectory::new(concat_paths!(
-                state.cache_directory(),
-                "targets",
-                &*recipe.name
-            ))
+            CacheDirectory::new(
+                state
+                    .cache_directory()
+                    .with_suffix("targets")
+                    .with_suffix(&*recipe.name),
+            )
         })
     }
 
     #[context("preparing the working directory for the build")]
-    pub(crate) fn build_working(&self, recipe: &Recipe, state: &State) -> anyhow::Result<&Path> {
+    pub(crate) fn build_working(
+        &self,
+        recipe: &Recipe,
+        state: &State,
+    ) -> anyhow::Result<&HostPath> {
         self.build_working
             .get_or_try_init(|| {
-                let working = concat_paths!(state.cache_directory(), "build", &*recipe.name);
-                make_empty_directory(&working)?;
+                // TODO: Put the cache subdirectories in the state struct.
+                let working = state
+                    .cache_directory()
+                    .with_suffix("build")
+                    .with_suffix(&*recipe.name);
+                make_empty_directory(&*working)?;
                 Ok(working)
             })
             .map(|path| &**path)
     }
 
-    pub(crate) fn build_root(&self, recipe: &Recipe, state: &State) -> anyhow::Result<&Path> {
+    pub(crate) fn build_root(&self, recipe: &Recipe, state: &State) -> anyhow::Result<&HostPath> {
         let cached = self.build_root.get_or_try_init(|| {
             recipe
                 .build
@@ -86,7 +84,7 @@ impl RecipeDirectories {
                     anyhow::Ok(
                         self.source(recipe.download_lock(state)?, state)?
                             .path()
-                            .join(suffix),
+                            .with_suffix(suffix),
                     )
                 })
                 .transpose()
@@ -106,25 +104,29 @@ impl RecipeDirectories {
         state: &State,
     ) -> anyhow::Result<&CacheDirectory> {
         self.source.get_or_try_init(|| {
-            let mut path = state.cache_directory().join("sources");
+            let mut buffer = PathBuf::from(state.cache_directory());
+            buffer.push("sources");
 
             match lock {
                 DownloadLock::None => {
                     return Ok(CacheDirectory::empty());
                 }
                 DownloadLock::Git { url, commit } => {
-                    path.push(encode_url(url));
-                    path.push(commit.to_string());
+                    buffer.push(encode_url(url));
+                    buffer.push(commit.to_string());
                 }
                 DownloadLock::Tarball {
                     url,
                     compression: _,
                 } => {
-                    path.push(encode_url(url));
+                    buffer.push(encode_url(url));
                 }
             }
 
-            CacheDirectory::new(path)
+            // Since we initialise the buffer with an absolute path, it should remain absolute.
+            CacheDirectory::new(
+                HostPath::new_boxed(buffer.into_boxed_path()).expect("the path should be absolute"),
+            )
         })
     }
 
@@ -134,12 +136,12 @@ impl RecipeDirectories {
         state: &State,
     ) -> anyhow::Result<&CacheDirectory> {
         self.repository.get_or_try_init(|| {
-            let mut path = state.cache_directory().join("repositories");
-
-            path.push(encode_url(url));
-            path.add_extension("git");
-
-            CacheDirectory::new(path)
+            CacheDirectory::new(
+                state
+                    .cache_directory()
+                    .with_suffix("repositories")
+                    .with_suffix(encode_url(url)),
+            )
         })
     }
 }
@@ -159,10 +161,13 @@ fn encode_url(url: &Url) -> String {
 
     let injection_factor = hasher.finish();
 
+    // TODO: Add an extension?
     format!("{human_readable_prefix}-{injection_factor}")
 }
 
-fn make_empty_directory(directory: &Path) -> anyhow::Result<()> {
+fn make_empty_directory(directory: impl AsRef<Path>) -> anyhow::Result<()> {
+    let directory = directory.as_ref();
+
     match remove_dir_all(directory) {
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
         result => result,
@@ -172,7 +177,9 @@ fn make_empty_directory(directory: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn is_directory_populated(directory: &Path) -> anyhow::Result<bool> {
+fn is_directory_populated(directory: impl AsRef<Path>) -> anyhow::Result<bool> {
+    let directory = directory.as_ref();
+
     if !directory.is_dir() {
         return Ok(false);
     }
@@ -182,17 +189,17 @@ fn is_directory_populated(directory: &Path) -> anyhow::Result<bool> {
 
 #[derive(Debug)]
 pub(crate) struct CacheDirectory {
-    path: PathBuf,
+    path: Box<HostPath>,
     is_populated: OnceTrue,
 }
 
 impl CacheDirectory {
-    fn new(path: PathBuf) -> anyhow::Result<CacheDirectory> {
+    fn new(path: Box<HostPath>) -> anyhow::Result<CacheDirectory> {
         let is_populated =
-            is_directory_populated(&path).context("detecting if the cache is populated")?;
+            is_directory_populated(&*path).context("detecting if the cache is populated")?;
 
         if !is_populated {
-            make_empty_directory(&path).context("preparing the directory")?;
+            make_empty_directory(&*path).context("preparing the directory")?;
         }
 
         Ok(CacheDirectory {
@@ -203,24 +210,25 @@ impl CacheDirectory {
 
     fn empty() -> CacheDirectory {
         CacheDirectory {
-            path: PathBuf::from("/var/empty"),
+            path: HostPath::new_boxed(Box::from(Path::new("/var/empty")))
+                .expect("`/var/empty` should be an absolute path"),
             is_populated: OnceTrue::new(true),
         }
     }
 
-    pub(crate) fn path(&self) -> &Path {
+    pub(crate) fn path(&self) -> &HostPath {
         &self.path
     }
 
-    pub(crate) fn as_populated(&self) -> Option<&Path> {
+    pub(crate) fn as_populated(&self) -> Option<&HostPath> {
         self.is_populated.get().then_some(&self.path)
     }
 
     // What a name.
     pub(crate) fn as_populated_then_run_or_populate_with<E>(
         &self,
-        on_populated: impl FnOnce(&Path),
-        populate: impl FnOnce(&Path) -> Result<(), E>,
+        on_populated: impl FnOnce(&HostPath),
+        populate: impl FnOnce(&HostPath) -> Result<(), E>,
     ) -> Result<(), E> {
         self.as_populated_then_try_or_populate_with(
             |path| {
@@ -234,8 +242,8 @@ impl CacheDirectory {
     // What a name.
     pub(crate) fn as_populated_then_try_or_populate_with<T, E>(
         &self,
-        on_populated: impl FnOnce(&Path) -> Result<T, E>,
-        populate: impl FnOnce(&Path) -> Result<T, E>,
+        on_populated: impl FnOnce(&HostPath) -> Result<T, E>,
+        populate: impl FnOnce(&HostPath) -> Result<T, E>,
     ) -> Result<T, E> {
         // We need to so this really ugly solution since the compiler cannot prove that both of our functions will run and that they won't run simultaneously.
         let return_value: OnceCell<Result<T, E>> = OnceCell::new();
@@ -280,7 +288,8 @@ impl<'data> Deserialize<'data> for CacheDirectory {
     where
         D: Deserializer<'data>,
     {
-        CacheDirectory::new(PathBuf::deserialize(deserialiser)?).map_err(serde::de::Error::custom)
+        CacheDirectory::new(Box::<HostPath>::deserialize(deserialiser)?)
+            .map_err(serde::de::Error::custom)
     }
 }
 

@@ -10,6 +10,7 @@ pub(crate) use download::Compression;
 pub(crate) use download::Download;
 pub(crate) use download::DownloadLock;
 
+use crate::HostPath;
 use crate::Ledger;
 use crate::State;
 use crate::Version;
@@ -24,7 +25,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_with::serde_as;
 use std::collections::HashMap;
-use std::path::Path;
 
 // TODO: Split this into a "simple" and "cached" type.
 // TODO: Make this opaque.
@@ -55,7 +55,7 @@ pub(crate) struct Recipe {
 
 impl Recipe {
     #[context("parsing the recipe at `{}`", path.display())]
-    pub(crate) fn read_from(path: &Path) -> anyhow::Result<Recipe> {
+    pub(crate) fn read_from(path: &HostPath) -> anyhow::Result<Recipe> {
         let file_name = path
             .file_name()
             .context("determining the recipe's file name")?;

@@ -1,6 +1,8 @@
+use crate::HostPath;
 use crate::Ledger;
 use crate::Recipe;
 use crate::ResultExtension as _;
+use crate::TargetPath;
 use crate::Version;
 use crate::VersionRequirement;
 use anyhow::Context;
@@ -11,23 +13,21 @@ use goblin::elf::Elf;
 use goblin::elf64::header::ELFMAG;
 use goblin::elf64::header::SELFMAG;
 use std::collections::HashMap;
-use std::ffi::OsStr;
 use std::io::Read;
-use std::path::Path;
 
 #[context("checking the runtime dependencies for the built `{}` recipe", recipe.name)]
 pub(crate) fn check_runtime_dependencies(
     ledger: &Ledger,
-    target: &Path,
+    target: &HostPath,
     recipe: &Recipe,
 ) -> anyhow::Result<()> {
     let elves: Vec<_> = ledger
         .files
         .iter()
-        .filter_map(|target_relative_path| {
-            let absolute_path = target.join(target_relative_path);
+        .filter_map(|target_path| {
+            let host_path = target_path.in_target(target);
 
-            parse_node(&absolute_path, target_relative_path.as_os_str())
+            parse_node(&host_path, target_path)
         })
         .collect();
 
@@ -53,14 +53,14 @@ pub(crate) fn check_runtime_dependencies(
             let Some(declared_version) = recipe.dependencies.versions.get(name) else {
                 bail!(
                     "the file `{}` requires the library `{name}` with version {needed_version} but it was not declared as a dependency",
-                    elf.file_name.display(),
+                    elf.path,
                 );
             };
 
             if !declared_version.always_satisfies(needed_version) {
                 bail!(
                     "the file `{}` requires the library ``{name}` with version {needed_version} but the declared dependency has version {declared_version}",
-                    elf.file_name.display(),
+                    elf.path,
                 )
             }
         }
@@ -70,13 +70,16 @@ pub(crate) fn check_runtime_dependencies(
 }
 
 struct ElfNode<'ledger> {
-    file_name: &'ledger OsStr,
+    path: &'ledger TargetPath,
     provides: Option<(Box<str>, Version)>,
     needs: HashMap<Box<str>, VersionRequirement>,
 }
 
-fn parse_node<'ledger>(path: &Path, file_name: &'ledger OsStr) -> Option<ElfNode<'ledger>> {
-    let mut file = File::open(path).ok_or_log()?;
+fn parse_node<'ledger>(
+    host_path: &HostPath,
+    target_path: &'ledger TargetPath,
+) -> Option<ElfNode<'ledger>> {
+    let mut file = File::open(host_path).ok_or_log()?;
 
     let mut magic_number_buffer = [0; SELFMAG];
 
@@ -93,7 +96,7 @@ fn parse_node<'ledger>(path: &Path, file_name: &'ledger OsStr) -> Option<ElfNode
     let elf = Elf::parse(&full_buffer).ok_or_log()?;
 
     Some(ElfNode {
-        file_name,
+        path: target_path,
         provides: elf
             .soname
             .and_then(|so_name| parse_so_provision(so_name).ok_or_log()),

@@ -1,3 +1,4 @@
+use crate::HostPath;
 use crate::Recipe;
 use crate::ResultExtension as _;
 use crate::VersionRequirement;
@@ -11,6 +12,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use tracing::warn;
 
+// TODO: Make this opaque and add a transparent `ManifestData` type.
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct Manifest {
     #[serde(skip)]
@@ -51,12 +53,15 @@ impl Manifest {
                             let entry = entry.ok_or_log()?;
                             let path = entry.path();
 
+                            // TODO: Don't try here, should be infallible.
+                            let path = HostPath::new(&path)?;
+
                             if entry.file_type().ok_or_log()?.is_dir() {
-                                warn!("skipping the directory {}", path.display());
+                                warn!("skipping the directory `{path}`");
                                 return None;
                             }
 
-                            Recipe::read_from(&path).ok_or_log()
+                            Recipe::read_from(path).ok_or_log()
                         }),
                 )
             })

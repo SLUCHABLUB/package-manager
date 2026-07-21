@@ -1,10 +1,10 @@
 use crate::Compression;
+use crate::HostPath;
 use anyhow::Context as _;
 use fn_error_context::context;
 use lzma_rs::xz_decompress;
 use reqwest::blocking::ClientBuilder;
 use std::io::Cursor;
-use std::path::Path;
 use tar::Archive;
 use url::Url;
 
@@ -12,7 +12,7 @@ use url::Url;
 pub(in crate::download) fn download_tarball(
     url: &Url,
     compression: Compression,
-    source_directory: &Path,
+    source_directory: &HostPath,
 ) -> anyhow::Result<()> {
     let client = ClientBuilder::new()
         .timeout(None)

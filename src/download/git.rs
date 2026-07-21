@@ -1,3 +1,4 @@
+use crate::HostPath;
 use crate::RecipeDirectories;
 use crate::Resolver;
 use crate::State;
@@ -17,7 +18,6 @@ use gix::remote::fetch::Shallow;
 use gix::remote::ref_map;
 use gix::worktree::state::checkout;
 use non_zero::non_zero;
-use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use tracing::info;
 use tracing::warn;
@@ -27,7 +27,7 @@ use url::Url;
 pub(in crate::download) fn download_git(
     url: &Url,
     commit: ObjectId,
-    source_directory: &Path,
+    source_directory: &HostPath,
     directories: &RecipeDirectories,
     state: &State,
 ) -> anyhow::Result<()> {

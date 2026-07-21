@@ -8,6 +8,7 @@ use std::path::Path;
 pub(crate) struct Build {
     #[serde(default)]
     pub dependencies: Dependencies,
+    // TODO: Enforce that this is relative.
     pub directory: Option<Box<Path>>,
 
     // TODO: The keys and values should be `OsStr`s but those serialise weirdly.
