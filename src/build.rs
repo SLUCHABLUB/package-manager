@@ -240,7 +240,7 @@ fn build_in_sandbox(mut instruction: BuildInstruction, sandbox: Sandbox) -> anyh
     }
 
     for copy in instruction.copies {
-        let destination = copy.to.in_target(instruction.target_directory);
+        let destination = copy.to.with_root(instruction.target_directory);
         let destination: &Path = (*destination).as_ref();
 
         if let Some(parent) = destination.parent() {

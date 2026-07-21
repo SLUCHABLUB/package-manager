@@ -219,15 +219,9 @@ impl TargetPath {
         TargetPath::from_absolute_boxed(prefix.with_suffix(suffix.as_ref()))
     }
 
-    // TODO: Merge with `in_staging` to `with_root`?
-    pub(crate) fn in_target(&self, target: &HostPath) -> Box<HostPath> {
+    pub(crate) fn with_root(&self, root: &HostPath) -> Box<HostPath> {
         let TargetPath(path) = self;
-        target.with_suffix(path.to_relative())
-    }
-
-    pub(crate) fn in_staging(&self, staging: &HostPath) -> Box<HostPath> {
-        let TargetPath(path) = self;
-        staging.with_suffix(path.to_relative())
+        root.with_suffix(path.to_relative())
     }
 }
 

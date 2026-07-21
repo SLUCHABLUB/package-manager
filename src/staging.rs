@@ -24,8 +24,8 @@ fn stage_single(recipe: &Recipe, staging: &HostPath, state: &State) -> anyhow::R
     let target = recipe.directories.target(recipe, state)?.path();
 
     for entry in &ledger.files {
-        let source = entry.in_target(target);
-        let destination = entry.in_staging(staging);
+        let source = entry.with_root(target);
+        let destination = entry.with_root(staging);
 
         let destination_parent = destination
             .parent()

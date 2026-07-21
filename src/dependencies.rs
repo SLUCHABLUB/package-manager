@@ -25,7 +25,7 @@ pub(crate) fn check_runtime_dependencies(
         .files
         .iter()
         .filter_map(|target_path| {
-            let host_path = target_path.in_target(target);
+            let host_path = target_path.with_root(target);
 
             parse_node(&host_path, target_path)
         })
