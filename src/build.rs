@@ -104,11 +104,9 @@ fn generate_commands(
 
     let target_directories = Directories::user()?;
 
-    // TODO: Pass the right prefixes.
     match &build.system {
         BuildSystem::None => (),
         // TODO: Should we add the version requirement here?
-        // TODO: Should we specify the binary?
         // TODO: --message-format json to get better logs?
         BuildSystem::Cargo {
             binary,
@@ -208,7 +206,6 @@ fn flag(name: &str, path: &TargetPath) -> OsString {
     buffer
 }
 
-// TODO: Add a sandbox parameter.
 fn build_in_sandbox(mut instruction: BuildInstruction, sandbox: Sandbox) -> anyhow::Result<()> {
     match sandbox {
         Sandbox::None => (),
