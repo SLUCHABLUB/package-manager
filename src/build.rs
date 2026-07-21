@@ -4,6 +4,7 @@ use crate::HostPath;
 use crate::Recipe;
 use crate::State;
 use crate::TargetPath;
+use crate::ensure_downloaded;
 use crate::recipe::Build;
 use anyhow::Context;
 use anyhow::bail;
@@ -13,6 +14,7 @@ use fs_err as fs;
 use std::ffi::OsString;
 use std::path::Path;
 use std::process::Command;
+use tracing::info;
 use tracing::warn;
 
 const CONFIGURE_MAKE_DISTINATION_DIRECTORY: &str = concat!("DEST", "DIR");
@@ -37,12 +39,27 @@ enum Sandbox {
     None,
 }
 
+pub(crate) fn ensure_built(recipe: &Recipe, state: &State) -> anyhow::Result<()> {
+    let name = &recipe.name;
+
+    recipe
+        .directories
+        .target(recipe, state)?
+        .as_populated_then_run_or_populate_with(
+            |_| info!("using the cached target directory for the `{name}` recipe"),
+            |into| {
+                info!("building the `{name}` recipe");
+                build(recipe, into, state)?;
+                info!("built the `{name}` recipe");
+                anyhow::Ok(())
+            },
+        )
+}
+
 #[context("building the `{}` recipe", recipe.name)]
-pub(crate) fn build(
-    recipe: &Recipe,
-    target_directory: &HostPath,
-    state: &State,
-) -> anyhow::Result<()> {
+fn build(recipe: &Recipe, target_directory: &HostPath, state: &State) -> anyhow::Result<()> {
+    ensure_downloaded(recipe, state)?;
+
     let build_root = recipe.directories.build_root(recipe, state)?;
     let working_directory = recipe.directories.build_working(recipe, state)?;
 
