@@ -17,6 +17,8 @@ pub(crate) struct HostDirectories {
     pub(crate) targets: Box<HostPath>,
 
     pub(crate) staging: Box<HostPath>,
+
+    // TODO: We should have locks on other things such as downloading, building and staging.
     pub(crate) lock_file: Box<HostPath>,
 }
 
