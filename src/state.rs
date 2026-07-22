@@ -1,8 +1,10 @@
 use crate::BuildPlan;
 use crate::Manifest;
 use crate::Recipe;
+use crate::TargetDirectories;
 use crate::VersionRequirement;
 use crate::directories::HostDirectories;
+use crate::install;
 use anyhow::bail;
 use fn_error_context::context;
 use fs_err::remove_dir_all;
@@ -31,10 +33,7 @@ impl State {
         })
     }
 
-    pub(crate) fn directories(&self) -> &HostDirectories {
-        &self.directories
-    }
-
+    // TODO: Create a compound ledger.
     /// Downloads, builds and stages all packages.
     pub fn stage(&self) -> anyhow::Result<()> {
         let staging = &*self.directories.staging;
@@ -46,6 +45,22 @@ impl State {
         }
 
         self.build_plan()?.stage(staging)
+    }
+
+    /// Downloads, builds and stages all packages.
+    pub fn install(&self) -> anyhow::Result<()> {
+        self.stage()?;
+
+        // TODO: Base this on the manifest.
+        let target_directories = TargetDirectories::user()?;
+
+        install(&target_directories)?;
+
+        Ok(())
+    }
+
+    pub(crate) fn directories(&self) -> &HostDirectories {
+        &self.directories
     }
 
     fn recipes(&self) -> impl Iterator<Item = &Recipe> {

@@ -28,7 +28,7 @@ fn try_main(arguments: Arguments) -> anyhow::Result<()> {
 
     let state = State::initialise()?;
 
-    state.stage()?;
+    state.install()?;
 
     Ok(())
 }
