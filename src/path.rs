@@ -15,12 +15,12 @@ struct AbsolutePath(Path);
 
 impl AbsolutePath {
     fn new_unchecked(path: &Path) -> &AbsolutePath {
-        // SAFETY: `AbsolutePath` is `repr(transparent)`
+        // SAFETY: `AbsolutePath` is `repr(transparent)` around `Path`.
         unsafe { &*(std::ptr::from_ref(path) as *const AbsolutePath) }
     }
 
     fn new_boxed_unchecked(path: Box<Path>) -> Box<AbsolutePath> {
-        // SAFETY: `AbsolutePath` is `repr(transparent)`
+        // SAFETY: `AbsolutePath` is `repr(transparent)` around `Path`.
         unsafe { transmute(path) }
     }
 
@@ -89,12 +89,12 @@ pub(crate) struct HostPath(AbsolutePath);
 
 impl HostPath {
     fn from_absolute(path: &AbsolutePath) -> &HostPath {
-        // SAFETY: `HostPath` is `repr(transparent)`
+        // SAFETY: `HostPath` is `repr(transparent)` around `AbsolutePath`.
         unsafe { &*(std::ptr::from_ref(path) as *const HostPath) }
     }
 
     fn from_absolute_boxed(path: Box<AbsolutePath>) -> Box<HostPath> {
-        // SAFETY: `HostPath` is `repr(transparent)`
+        // SAFETY: `HostPath` is `repr(transparent)` around `AbsolutePath`.
         unsafe { transmute(path) }
     }
 
@@ -104,6 +104,24 @@ impl HostPath {
 
     pub(crate) fn new_boxed(path: Box<Path>) -> Result<Box<HostPath>, Box<Path>> {
         AbsolutePath::new_boxed(path).map(Self::from_absolute_boxed)
+    }
+
+    pub(crate) fn parent(&self) -> Option<&HostPath> {
+        // The parent of an absolute path should be absolute.
+        (**self)
+            .parent()
+            .map(AbsolutePath::new_unchecked)
+            .map(Self::from_absolute)
+    }
+
+    pub(crate) fn to_target_path(&self) -> &TargetPath {
+        let HostPath(absolute) = self;
+        TargetPath::from_absolute(absolute)
+    }
+
+    pub(crate) fn into_target_path(self: Box<Self>) -> Box<TargetPath> {
+        // SAFETY: `HostPath` and `TargetPath` are both `repr(transparent)` around `AbsolutePath`.
+        unsafe { transmute(self) }
     }
 
     /// Joins a relative path onto the end of this path.
@@ -154,6 +172,12 @@ impl Deref for HostPath {
     }
 }
 
+impl From<&HostPath> for Box<HostPath> {
+    fn from(path: &HostPath) -> Self {
+        HostPath::from_absolute_boxed(AbsolutePath::new_boxed_unchecked(Box::from(&**path)))
+    }
+}
+
 impl<'de> Deserialize<'de> for Box<HostPath> {
     fn deserialize<D>(deserialiser: D) -> Result<Self, D::Error>
     where
@@ -174,12 +198,12 @@ pub(crate) struct TargetPath(AbsolutePath);
 
 impl TargetPath {
     fn from_absolute(path: &AbsolutePath) -> &TargetPath {
-        // SAFETY: `TargetPath is `repr(transparent)`
+        // SAFETY: `TargetPath is `repr(transparent)` around `AbsolutePath`.
         unsafe { &*(std::ptr::from_ref(path) as *const TargetPath) }
     }
 
     fn from_absolute_boxed(path: Box<AbsolutePath>) -> Box<TargetPath> {
-        // SAFETY: `TargetPath` is `repr(transparent)`
+        // SAFETY: `TargetPath` is `repr(transparent)` around `AbsolutePath`.
         unsafe { transmute(path) }
     }
 

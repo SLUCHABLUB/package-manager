@@ -1,32 +1,28 @@
 use crate::BuildPlan;
-use crate::HostPath;
 use crate::Manifest;
-use crate::PACKAGE_NAME;
 use crate::Recipe;
 use crate::VersionRequirement;
-use anyhow::Context as _;
+use crate::directories::HostDirectories;
 use anyhow::bail;
-use directories::ProjectDirs;
 use fn_error_context::context;
 use fs_err::remove_dir_all;
 use once_cell::unsync::OnceCell;
 use std::io;
-use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct State {
     main_manifest: Manifest,
-    directories: ProjectDirs,
+    directories: HostDirectories,
     recipes: OnceCell<Box<[Recipe]>>,
 }
 
 impl State {
     #[context("initialising the package manager state")]
     pub fn initialise() -> anyhow::Result<State> {
-        let directories = ProjectDirs::from_path(PathBuf::from(PACKAGE_NAME))
-            .context("determining project directories")?;
+        let directories = HostDirectories::new()?;
 
-        let manifest = Manifest::read_from(directories.config_dir().join("manifest.toml"))?;
+        let manifest =
+            Manifest::read_from(directories.user_configuration.with_suffix("manifest.toml"))?;
 
         Ok(State {
             main_manifest: manifest,
@@ -35,22 +31,21 @@ impl State {
         })
     }
 
-    /// Downloads, builds and stages all packages.
-    #[expect(clippy::missing_panics_doc, reason = "this should never panic")]
-    pub fn stage(&self) -> anyhow::Result<()> {
-        // TODO: Base this on the install location.
-        // The `directories` crate has already checked that the path is absolute.
-        let staging = HostPath::new(self.directories.data_dir())
-            .expect("the data directory should be absolute")
-            .with_suffix("staging");
+    pub(crate) fn directories(&self) -> &HostDirectories {
+        &self.directories
+    }
 
-        match remove_dir_all(&*staging) {
+    /// Downloads, builds and stages all packages.
+    pub fn stage(&self) -> anyhow::Result<()> {
+        let staging = &*self.directories.staging;
+
+        match remove_dir_all(staging) {
             Ok(()) => (),
             Err(error) if error.kind() == io::ErrorKind::NotFound => (),
             result @ Err(_) => result?,
         }
 
-        self.build_plan()?.stage(&staging)
+        self.build_plan()?.stage(staging)
     }
 
     fn recipes(&self) -> impl Iterator<Item = &Recipe> {
@@ -108,11 +103,5 @@ impl State {
         }
 
         Ok(plan)
-    }
-
-    pub(crate) fn cache_directory(&self) -> &HostPath {
-        // The `directories` crate has already checked that this is absolute
-        HostPath::new(self.directories.cache_dir())
-            .expect("the cache directory path should be absolute")
     }
 }

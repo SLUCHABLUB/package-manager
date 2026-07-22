@@ -1,8 +1,8 @@
 use crate::BuildSystem;
-use crate::Directories;
 use crate::HostPath;
 use crate::Recipe;
 use crate::State;
+use crate::TargetDirectories;
 use crate::TargetPath;
 use crate::ensure_downloaded;
 use crate::recipe::Build;
@@ -102,7 +102,7 @@ fn generate_commands(
 ) -> anyhow::Result<Vec<Command>> {
     let mut commands = Vec::new();
 
-    let target_directories = Directories::user()?;
+    let target_directories = TargetDirectories::user()?;
 
     match &build.system {
         BuildSystem::None => (),
@@ -154,17 +154,17 @@ fn generate_commands(
             let mut configure = Command::new(&*build_root.with_suffix("configure"));
 
             configure.arg(flag("prefix", &target_directories.prefix));
-            configure.arg(flag("bindir", &target_directories.executables));
+            configure.arg(flag("bindir", target_directories.executables));
             // TODO: Maybe set "sbindir"?
-            configure.arg(flag("libexecdir", &target_directories.internal_executables));
-            configure.arg(flag("datarootdir", &target_directories.data));
-            configure.arg(flag("datadir", &target_directories.data));
-            configure.arg(flag("sysconfdir", &target_directories.configuration));
-            configure.arg(flag("sharedstatedir", &target_directories.state));
-            configure.arg(flag("localstatedir", &target_directories.state));
-            configure.arg(flag("runstatedir", &target_directories.runtime));
-            configure.arg(flag("includedir", &target_directories.headers));
-            configure.arg(flag("libdir", &target_directories.libraries));
+            configure.arg(flag("libexecdir", target_directories.internal_executables));
+            configure.arg(flag("datarootdir", target_directories.data));
+            configure.arg(flag("datadir", target_directories.data));
+            configure.arg(flag("sysconfdir", target_directories.configuration));
+            configure.arg(flag("sharedstatedir", target_directories.state));
+            configure.arg(flag("localstatedir", target_directories.state));
+            configure.arg(flag("runstatedir", target_directories.runtime));
+            configure.arg(flag("includedir", target_directories.headers));
+            configure.arg(flag("libdir", target_directories.libraries));
 
             for flag in configure_flags {
                 configure.arg(&**flag);

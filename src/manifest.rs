@@ -8,18 +8,22 @@ use fs_err::read_to_string;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::fmt::Display;
+use std::ops::Deref;
 use std::path::Path;
-use std::path::PathBuf;
 use tracing::warn;
 
 // TODO: Make this opaque and add a transparent `ManifestData` type.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub(crate) struct Manifest {
-    #[serde(skip)]
-    pub path: PathBuf,
-    #[serde(skip)]
-    pub parent_directory: PathBuf,
+    path: Box<HostPath>,
+    parent_directory: Box<HostPath>,
 
+    data: ManifestData,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct ManifestData {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub packages: HashMap<Box<str>, VersionRequirement>,
     /// A map from package name to recipe name.
@@ -30,16 +34,20 @@ pub(crate) struct Manifest {
 }
 
 impl Manifest {
-    pub(crate) fn read_from(path: PathBuf) -> anyhow::Result<Manifest> {
+    pub(crate) fn read_from(path: Box<HostPath>) -> anyhow::Result<Manifest> {
         let manifest = read_to_string(&path)?;
-        let mut manifest: Manifest = toml::from_str(&manifest)?;
+        let data: ManifestData = toml::from_str(&manifest)?;
 
-        path.parent()
-            .with_context(|| format!("getting the parent of `{}`", path.display()))?
-            .clone_into(&mut manifest.parent_directory);
-        manifest.path = path;
+        let parent_directory = path
+            .parent()
+            .with_context(|| format!("getting the parent of `{path}`"))?
+            .into();
 
-        Ok(manifest)
+        Ok(Manifest {
+            path,
+            parent_directory,
+            data,
+        })
     }
 
     pub(crate) fn read_recipes(&self) -> impl Iterator<Item = Recipe> {
@@ -66,5 +74,20 @@ impl Manifest {
                 )
             })
             .flatten()
+    }
+}
+
+impl Display for Manifest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "the manifest at `{}`", self.path)
+    }
+}
+
+// Is this a sin?
+impl Deref for Manifest {
+    type Target = ManifestData;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
     }
 }

@@ -46,12 +46,7 @@ impl RecipeDirectories {
     pub(crate) fn target(&self, recipe: &Recipe, state: &State) -> anyhow::Result<&CacheDirectory> {
         // TODO: Base this on the recipe hash.
         self.target.get_or_try_init(|| {
-            CacheDirectory::new(
-                state
-                    .cache_directory()
-                    .with_suffix("targets")
-                    .with_suffix(&*recipe.name),
-            )
+            CacheDirectory::new(state.directories().targets.with_suffix(&*recipe.name))
         })
     }
 
@@ -64,10 +59,7 @@ impl RecipeDirectories {
         self.build_working
             .get_or_try_init(|| {
                 // TODO: Put the cache subdirectories in the state struct.
-                let working = state
-                    .cache_directory()
-                    .with_suffix("build")
-                    .with_suffix(&*recipe.name);
+                let working = state.directories().working.with_suffix(&*recipe.name);
                 make_empty_directory(&*working)?;
                 Ok(working)
             })
@@ -104,8 +96,7 @@ impl RecipeDirectories {
         state: &State,
     ) -> anyhow::Result<&CacheDirectory> {
         self.source.get_or_try_init(|| {
-            let mut buffer = PathBuf::from(state.cache_directory());
-            buffer.push("sources");
+            let mut buffer = PathBuf::from(&*state.directories().sources);
 
             match lock {
                 DownloadLock::None => {
@@ -140,8 +131,8 @@ impl RecipeDirectories {
         self.repository.get_or_try_init(|| {
             CacheDirectory::new(
                 state
-                    .cache_directory()
-                    .with_suffix("repositories")
+                    .directories()
+                    .repositories
                     .with_suffix(encode_url(url)),
             )
         })
