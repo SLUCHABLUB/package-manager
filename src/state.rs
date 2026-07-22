@@ -1,7 +1,6 @@
 use crate::BuildPlan;
 use crate::Manifest;
 use crate::Recipe;
-use crate::TargetDirectories;
 use crate::VersionRequirement;
 use crate::directories::HostDirectories;
 use crate::install;
@@ -51,10 +50,7 @@ impl State {
     pub fn install(&self) -> anyhow::Result<()> {
         self.stage()?;
 
-        // TODO: Base this on the manifest.
-        let target_directories = TargetDirectories::user()?;
-
-        install(&target_directories)?;
+        install(&self.directories)?;
 
         Ok(())
     }

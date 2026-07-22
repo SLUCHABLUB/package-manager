@@ -102,6 +102,7 @@ fn generate_commands(
 ) -> anyhow::Result<Vec<Command>> {
     let mut commands = Vec::new();
 
+    // TODO: Take this as a parameter.
     let target_directories = TargetDirectories::user()?;
 
     match &build.system {

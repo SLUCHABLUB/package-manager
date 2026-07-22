@@ -1,10 +1,10 @@
-use crate::TargetDirectories;
+use crate::directories::HostDirectories;
 use tracing::info;
 use tracing::warn;
 
 // TODO: Take an installation method parameter.
 #[expect(clippy::unnecessary_wraps, reason = "todo")]
-pub(crate) fn install(directories: &TargetDirectories) -> anyhow::Result<()> {
+pub(crate) fn install(directories: &HostDirectories) -> anyhow::Result<()> {
     warn!("installing... don't touch the file system please");
 
     // TODO: Acquire the lock.
