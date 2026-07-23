@@ -156,7 +156,7 @@ fn generate_commands(
 
             configure.arg(flag("prefix", &target_directories.prefix));
             configure.arg(flag("bindir", target_directories.executables));
-            // TODO: Maybe set "sbindir"?
+            configure.arg(flag("sbindir", target_directories.system_executables));
             configure.arg(flag("libexecdir", target_directories.internal_executables));
             configure.arg(flag("datarootdir", target_directories.data));
             configure.arg(flag("datadir", target_directories.data));

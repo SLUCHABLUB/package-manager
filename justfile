@@ -5,3 +5,6 @@ test:
 clean:
     cargo clean
     @just ui-tests/clean-all
+
+offline-clean-tests:
+    @just ui-tests/offline-clean-all

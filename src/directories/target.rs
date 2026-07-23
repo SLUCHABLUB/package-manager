@@ -18,11 +18,11 @@ pub(crate) struct TargetDirectories {
     pub data: &'static TargetPath,
     pub executables: &'static TargetPath,
     pub headers: &'static TargetPath,
-    // TODO: Make this optional?
     pub internal_executables: &'static TargetPath,
     pub libraries: &'static TargetPath,
     pub runtime: &'static TargetPath,
     pub state: &'static TargetPath,
+    pub system_executables: &'static TargetPath,
 }
 
 impl TargetDirectories {
@@ -45,14 +45,15 @@ impl TargetDirectories {
 
         Some(TargetDirectories {
             prefix,
-            executables,
-            data,
-            internal_executables: libraries,
-            state,
             configuration,
+            data,
+            executables,
             headers,
+            internal_executables: libraries,
             libraries,
             runtime,
+            state,
+            system_executables: executables,
         })
     }
 }

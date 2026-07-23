@@ -3,6 +3,5 @@
 */data
 */state
 
-# TODO: Figure out how to handle this.
-*/.cargo
-*/.rustup
+# TODO: Glibc is wack.
+.local

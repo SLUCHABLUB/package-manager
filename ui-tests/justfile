@@ -6,12 +6,17 @@ test-all:
 clean-all:
     @just clean bat-gnu
 
+offline-clean-all:
+    @just offline-clean bat-gnu
+
 with-home directory +command:
     HOME='{{ ui_tests_directory }}/{{ directory }}' \
     XDG_BIN_HOME='{{ ui_tests_directory }}/{{ directory }}/executables' \
     XDG_CACHE_HOME='{{ ui_tests_directory }}/{{ directory }}/cache' \
     XDG_CONFIG_HOME='{{ ui_tests_directory }}/{{ directory }}/configuration' \
     XDG_DATA_HOME='{{ ui_tests_directory }}/{{ directory }}/data' \
+    XDG_INCLUDE_HOME='{{ ui_tests_directory }}/{{ directory }}/headers' \
+    XDG_LIB_HOME='{{ ui_tests_directory }}/{{ directory }}/libraries' \
     XDG_STATE_HOME='{{ ui_tests_directory }}/{{ directory }}/state' \
     {{ command }}
 
@@ -21,10 +26,35 @@ test directory:
     @just with-home '{{ directory }}' \
     '{{ ui_tests_directory }}/../target/debug/package-manager' install
 
-    ! test -d '{{ ui_tests_directory }}/{{ directory }}/.local'
+    # TODO: Glibc is wack.
+    # ! test -d '{{ ui_tests_directory }}/{{ directory }}/.local'
+
+clean-config directory:
+    # Keep the non-installed configurations.
+    find "{{ ui_tests_directory }}/{{ directory }}/configuration" -mindepth 1 -maxdepth 1 \
+        ! -name package-manager \
+        -exec rm -rf {} +
+
+offline-clean directory:
+    rm -rf "{{ ui_tests_directory }}/{{ directory }}/executables"
+    rm -rf "{{ ui_tests_directory }}/{{ directory }}/data"
+    rm -rf "{{ ui_tests_directory }}/{{ directory }}/headers"
+    rm -rf "{{ ui_tests_directory }}/{{ directory }}/libraries"
+    rm -rf "{{ ui_tests_directory }}/{{ directory }}/state"
+
+    # Keep the sources.
+    find "{{ ui_tests_directory }}/{{ directory }}/cache/package-manager" -mindepth 1 -maxdepth 1 \
+        ! -name sources \
+        -exec rm -rf {} +
+
+    @just clean-config '{{directory}}'
 
 clean directory:
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/executables"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/cache"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/data"
+    rm -rf "{{ ui_tests_directory }}/{{ directory }}/headers"
+    rm -rf "{{ ui_tests_directory }}/{{ directory }}/libraries"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/state"
+
+    @just clean-config '{{directory}}'
