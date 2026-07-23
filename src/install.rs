@@ -89,7 +89,13 @@ pub(crate) fn install(directories: &HostDirectories, ledger: SystemLedger) -> an
         fs::copy(old, destination)?;
     }
 
-    // TODO: Do the rename.
+    for operation in &journal.operations {
+        let temporary = operation.temporary.to_host_path();
+        let destination = operation.file.to_host_path();
+
+        // TODO: Specialise on linux et al. to use rename2e when there is no backup.
+        fs::rename(temporary, destination)?;
+    }
 
     drop(journal_file);
     remove_file(&*directories.journal_file)?;

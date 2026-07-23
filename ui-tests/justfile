@@ -41,6 +41,8 @@ offline-clean directory:
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/headers"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/libraries"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/state"
+    # Glibc is wack.
+    rm -rf "{{ ui_tests_directory }}/{{ directory }}/.local"
 
     # Keep the sources.
     find "{{ ui_tests_directory }}/{{ directory }}/cache/package-manager" -mindepth 1 -maxdepth 1 \
@@ -56,5 +58,7 @@ clean directory:
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/headers"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/libraries"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/state"
+    # Glibc is wack.
+    rm -rf "{{ ui_tests_directory }}/{{ directory }}/.local"
 
     @just clean-config '{{directory}}'
