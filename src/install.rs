@@ -1,3 +1,4 @@
+use crate::SystemLedger;
 use crate::directories::HostDirectories;
 use fn_error_context::context;
 use fs_err::File;
@@ -6,12 +7,14 @@ use tracing::info;
 use tracing::warn;
 
 // TODO: Take an installation method parameter.
-pub(crate) fn install(directories: &HostDirectories) -> anyhow::Result<()> {
+pub(crate) fn install(directories: &HostDirectories, ledger: SystemLedger) -> anyhow::Result<()> {
     warn!("installing... don't touch the file system please");
 
     let lock = lock(directories)?;
 
     // TODO: Try recover (if the journal exists).
+
+    drop(ledger);
 
     // TODO: Do a conflict check.
     // TODO: Create the journal (including the ledger).

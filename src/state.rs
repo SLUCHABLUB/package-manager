@@ -1,6 +1,7 @@
 use crate::BuildPlan;
 use crate::Manifest;
 use crate::Recipe;
+use crate::SystemLedger;
 use crate::VersionRequirement;
 use crate::directories::HostDirectories;
 use crate::install;
@@ -32,9 +33,17 @@ impl State {
         })
     }
 
-    // TODO: Create a compound ledger.
+    /// Downloads, builds, and installs all packages.
+    pub fn install(&self) -> anyhow::Result<()> {
+        let ledger = self.stage()?;
+
+        install(&self.directories, ledger)?;
+
+        Ok(())
+    }
+
     /// Downloads, builds and stages all packages.
-    pub fn stage(&self) -> anyhow::Result<()> {
+    pub(crate) fn stage(&self) -> anyhow::Result<SystemLedger> {
         let staging = &*self.directories.staging;
 
         match remove_dir_all(staging) {
@@ -44,15 +53,6 @@ impl State {
         }
 
         self.build_plan()?.stage(staging)
-    }
-
-    /// Downloads, builds and stages all packages.
-    pub fn install(&self) -> anyhow::Result<()> {
-        self.stage()?;
-
-        install(&self.directories)?;
-
-        Ok(())
     }
 
     pub(crate) fn directories(&self) -> &HostDirectories {

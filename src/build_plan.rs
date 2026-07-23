@@ -1,6 +1,7 @@
 use crate::HostPath;
 use crate::Recipe;
 use crate::State;
+use crate::SystemLedger;
 use crate::VersionRequirement;
 use crate::prepare_to_install;
 use crate::stage_recipes;
@@ -56,10 +57,10 @@ impl<'state> BuildPlan<'state> {
         Ok(())
     }
 
-    pub(crate) fn stage(&self, into: &HostPath) -> anyhow::Result<()> {
+    pub(crate) fn stage(&self, into: &HostPath) -> anyhow::Result<SystemLedger> {
         self.prepare_to_install()?;
-        stage_recipes(&self.recipes, into, self.state)?;
+        let ledger = stage_recipes(&self.recipes, into, self.state)?;
 
-        Ok(())
+        Ok(ledger)
     }
 }
