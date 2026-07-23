@@ -6,7 +6,9 @@ use anyhow::bail;
 use const_str::concat;
 use fn_error_context::context;
 use fs_err::File;
+use serde::Serialize;
 use std::fs::TryLockError;
+use std::io::Write;
 use tracing::info;
 use tracing::warn;
 
@@ -46,16 +48,26 @@ pub(crate) fn install(directories: &HostDirectories, ledger: SystemLedger) -> an
         }
     }
 
-    // TODO: Drop mut on the journal.
+    let journal = journal;
 
-    // TODO: Write the journal to the file system.
+    let serialised_journal = toml::to_string(&journal)?;
+
+    let journal_directory = File::open(&*directories.journal_directory)?;
+    let mut journal_file = File::create_new(&*directories.journal_file)?;
+
+    // TODO: Don't use the try operator beyond this point until we've removed the journal.
+
+    journal_file.write_all(serialised_journal.as_bytes())?;
+
+    journal_file.sync_all()?;
+    journal_directory.sync_all()?;
+
     // TODO: Create the temporary files.
     // TODO: Create the backups.
     // TODO: Do the rename.
     // TODO: Remove the journal.
     // TODO: Remove the backups.
 
-    let _ = directories;
     warn!("not actually installing :P");
 
     // If this fails, the kernel will release the lock.
@@ -115,7 +127,7 @@ fn check_conflict(file: &TargetPath) -> ConflictCheckResult {
     ConflictCheckResult::New
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize)]
 struct Journal {
     operations: Vec<InstallOperation>,
 }
@@ -126,7 +138,7 @@ impl Journal {
     }
 }
 
-#[expect(unused, reason = "TODO")]
+#[derive(Serialize)]
 struct InstallOperation {
     file: Box<TargetPath>,
     temporary: Box<TargetPath>,
