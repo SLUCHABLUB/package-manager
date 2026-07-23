@@ -44,7 +44,7 @@ fn stage_single(
         fs::copy(source, destination)?;
 
         system_ledger
-            .packages
+            .recipes
             .insert(recipe.name.clone(), package_ledger.clone());
     }
 

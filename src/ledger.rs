@@ -11,10 +11,11 @@ use std::collections::HashMap;
 use tracing::warn;
 use walkdir::WalkDir;
 
+// TODO: Make this opaque.
 #[derive(Default, Serialize, Deserialize)]
 pub(crate) struct SystemLedger {
     #[serde(flatten)]
-    pub packages: HashMap<Box<str>, PackageLedger>,
+    pub recipes: HashMap<Box<str>, PackageLedger>,
 }
 
 impl SystemLedger {
@@ -23,6 +24,7 @@ impl SystemLedger {
     }
 }
 
+// TODO: Make this opaque.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub(crate) struct PackageLedger {
     // TODO: Make this a map (list of entries!), from file to hash.

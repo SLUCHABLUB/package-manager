@@ -1,5 +1,7 @@
 use crate::SystemLedger;
+use crate::TargetPath;
 use crate::directories::HostDirectories;
+use anyhow::bail;
 use fn_error_context::context;
 use fs_err::File;
 use std::fs::TryLockError;
@@ -8,15 +10,27 @@ use tracing::warn;
 
 // TODO: Take an installation method parameter.
 pub(crate) fn install(directories: &HostDirectories, ledger: SystemLedger) -> anyhow::Result<()> {
-    warn!("installing... don't touch the file system please");
-
     let lock = lock(directories)?;
+
+    warn!("installing... don't touch the file system please");
 
     // TODO: Try recover (if the journal exists).
 
-    drop(ledger);
+    for (recipe, ledger) in ledger.recipes {
+        for file in ledger.files {
+            // TODO: Record this in the journal.
+            match check_conflict(&file) {
+                ConflictCheckResult::New => (),
+                ConflictCheckResult::Unmanaged => {
+                    // TODO: We could prompt the user here.
+                    bail!(
+                        "the installation of the `{recipe}` recipe would override the unmanaged file at `{file}`"
+                    );
+                }
+            }
+        }
+    }
 
-    // TODO: Do a conflict check.
     // TODO: Create the journal (including the ledger).
     // TODO: Create the temporary files.
     // TODO: Create the backups.
@@ -63,4 +77,23 @@ fn unlock(file: File) -> anyhow::Result<()> {
     drop(file);
 
     Ok(())
+}
+
+enum ConflictCheckResult {
+    /// The file did not exist in the last generation.
+    New,
+    /// The file existed on the system but was not managed by the package manager.
+    Unmanaged,
+}
+
+fn check_conflict(file: &TargetPath) -> ConflictCheckResult {
+    let file = file.to_host_path();
+
+    if file.exists() {
+        // TODO: Check if the file matches the old ledger.
+
+        return ConflictCheckResult::Unmanaged;
+    }
+
+    ConflictCheckResult::New
 }
