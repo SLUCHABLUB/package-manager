@@ -1,7 +1,12 @@
-*/bin
 */cache
 */data
+*/executables
+*/headers
+*/libraries
 */state
+
+*/configuration/*
+!*/configuration/package-manager
 
 # TODO: Glibc is wack.
 .local

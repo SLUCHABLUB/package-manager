@@ -77,7 +77,16 @@ pub(crate) fn install(directories: &HostDirectories, ledger: SystemLedger) -> an
         fs::copy(staged, destination)?;
     }
 
-    // TODO: Create the backups.
+    for operation in &journal.operations {
+        let old = operation.file.to_host_path();
+        let destination = match &operation.backup {
+            Some(path) => path.to_host_path(),
+            None => continue,
+        };
+
+        fs::copy(old, destination)?;
+    }
+
     // TODO: Do the rename.
 
     drop(journal_file);
