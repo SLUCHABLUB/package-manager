@@ -6,6 +6,7 @@ use anyhow::bail;
 use const_str::concat;
 use fn_error_context::context;
 use fs_err::File;
+use fs_err::remove_file;
 use serde::Serialize;
 use std::fs::TryLockError;
 use std::io::Write;
@@ -65,7 +66,13 @@ pub(crate) fn install(directories: &HostDirectories, ledger: SystemLedger) -> an
     // TODO: Create the temporary files.
     // TODO: Create the backups.
     // TODO: Do the rename.
-    // TODO: Remove the journal.
+
+    drop(journal_file);
+    remove_file(&*directories.journal_file)?;
+
+    journal_directory.sync_all()?;
+    drop(journal_directory);
+
     // TODO: Remove the backups.
 
     warn!("not actually installing :P");
