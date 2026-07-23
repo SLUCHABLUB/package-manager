@@ -5,7 +5,9 @@ use crate::directories::HostDirectories;
 use anyhow::bail;
 use const_str::concat;
 use fn_error_context::context;
+use fs_err as fs;
 use fs_err::File;
+use fs_err::create_dir_all;
 use fs_err::remove_file;
 use serde::Serialize;
 use std::fs::TryLockError;
@@ -63,7 +65,18 @@ pub(crate) fn install(directories: &HostDirectories, ledger: SystemLedger) -> an
     journal_file.sync_all()?;
     journal_directory.sync_all()?;
 
-    // TODO: Create the temporary files.
+    for operation in &journal.operations {
+        let staged = operation.file.with_root(&directories.staging);
+        let destination = operation.temporary.to_host_path();
+
+        if let Some(parent) = destination.parent() {
+            // TODO: Handle directory permissions.
+            create_dir_all(parent)?;
+        }
+
+        fs::copy(staged, destination)?;
+    }
+
     // TODO: Create the backups.
     // TODO: Do the rename.
 
