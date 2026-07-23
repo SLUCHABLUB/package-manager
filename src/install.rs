@@ -1,7 +1,9 @@
 use crate::PACKAGE_NAME;
+use crate::ResultExtension;
 use crate::SystemLedger;
 use crate::TargetPath;
 use crate::directories::HostDirectories;
+use anyhow::Context as _;
 use anyhow::bail;
 use const_str::concat;
 use fn_error_context::context;
@@ -95,7 +97,14 @@ pub(crate) fn install(directories: &HostDirectories, ledger: SystemLedger) -> an
     journal_directory.sync_all()?;
     drop(journal_directory);
 
-    // TODO: Remove the backups.
+    for operation in &journal.operations {
+        let backup = match &operation.backup {
+            Some(path) => path.to_host_path(),
+            None => continue,
+        };
+
+        remove_file(backup).context("removing backups").ok_or_log();
+    }
 
     warn!("not actually installing :P");
 
