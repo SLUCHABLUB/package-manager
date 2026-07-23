@@ -1,5 +1,5 @@
 use crate::HostPath;
-use crate::Ledger;
+use crate::PackageLedger;
 use crate::Recipe;
 use crate::ResultExtension as _;
 use crate::TargetPath;
@@ -17,7 +17,7 @@ use std::io::Read;
 
 #[context("checking the runtime dependencies for the built `{}` recipe", recipe.name)]
 pub(crate) fn check_runtime_dependencies(
-    ledger: &Ledger,
+    ledger: &PackageLedger,
     target: &HostPath,
     recipe: &Recipe,
 ) -> anyhow::Result<()> {

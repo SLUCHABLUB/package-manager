@@ -11,7 +11,7 @@ pub(crate) use download::Download;
 pub(crate) use download::DownloadLock;
 
 use crate::HostPath;
-use crate::Ledger;
+use crate::PackageLedger;
 use crate::State;
 use crate::Version;
 use crate::VersionRequirement;
@@ -49,8 +49,10 @@ pub(crate) struct Recipe {
     pub download_lock: OnceCell<DownloadLock>,
     #[serde(default)]
     pub directories: RecipeDirectories,
+
+    // TODO: Move this out of here so it's ownership is tracked independently.
     #[serde(default, with = "once_cell_as_option")]
-    pub ledger: OnceCell<Ledger>,
+    pub ledger: OnceCell<PackageLedger>,
 }
 
 impl Recipe {

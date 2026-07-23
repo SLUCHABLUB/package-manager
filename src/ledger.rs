@@ -7,28 +7,43 @@ use anyhow::Context;
 use fn_error_context::context;
 use serde::Deserialize;
 use serde::Serialize;
+use std::collections::HashMap;
 use tracing::warn;
 use walkdir::WalkDir;
 
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub(crate) struct Ledger {
+#[derive(Default, Serialize, Deserialize)]
+pub(crate) struct SystemLedger {
+    #[serde(flatten)]
+    pub packages: HashMap<Box<str>, PackageLedger>,
+}
+
+impl SystemLedger {
+    pub(crate) fn new() -> SystemLedger {
+        SystemLedger::default()
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub(crate) struct PackageLedger {
+    // TODO: Make this a map (list of entries!), from file to hash.
+    #[serde(flatten)]
     pub files: Box<[Box<TargetPath>]>,
 }
 
-impl Ledger {
+impl PackageLedger {
     #[context(
         // TODO: Figure out how to do this cleanly.
         "creating a ledger of the target directory `{:?}`",
         recipe.directories.target(recipe, state).map(CacheDirectory::path)
     )]
-    pub(crate) fn new(recipe: &Recipe, state: &State) -> anyhow::Result<Ledger> {
+    pub(crate) fn new(recipe: &Recipe, state: &State) -> anyhow::Result<PackageLedger> {
         let target_directory = recipe.directories.target(recipe, state)?;
         let Some(target_directory) = target_directory.as_populated() else {
             warn!(
                 "creating a ledger for the empty directory `{}`",
                 target_directory.path()
             );
-            return Ok(Ledger::default());
+            return Ok(PackageLedger::default());
         };
 
         let mut files = Vec::new();
@@ -46,7 +61,7 @@ impl Ledger {
             files.push(TargetPath::from_path_and_root(path, target_directory));
         }
 
-        Ok(Ledger {
+        Ok(PackageLedger {
             files: files.into_boxed_slice(),
         })
     }
