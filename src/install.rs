@@ -1,12 +1,17 @@
+use crate::PACKAGE_NAME;
 use crate::SystemLedger;
 use crate::TargetPath;
 use crate::directories::HostDirectories;
 use anyhow::bail;
+use const_str::concat;
 use fn_error_context::context;
 use fs_err::File;
 use std::fs::TryLockError;
 use tracing::info;
 use tracing::warn;
+
+const TYEMPORARY_EXTENSION: &str = concat!(PACKAGE_NAME, '-', "temporary");
+//const BACKUP_EXTENSION: &str = concat!(PACKAGE_NAME, '-', "backup");
 
 // TODO: Take an installation method parameter.
 pub(crate) fn install(directories: &HostDirectories, ledger: SystemLedger) -> anyhow::Result<()> {
@@ -16,11 +21,21 @@ pub(crate) fn install(directories: &HostDirectories, ledger: SystemLedger) -> an
 
     // TODO: Try recover (if the journal exists).
 
+    let mut journal = Journal::new();
+
     for (recipe, ledger) in ledger.recipes {
         for file in ledger.files {
             // TODO: Record this in the journal.
             match check_conflict(&file) {
-                ConflictCheckResult::New => (),
+                ConflictCheckResult::New => {
+                    let temporary = file.with_extension(TYEMPORARY_EXTENSION);
+
+                    journal.operations.push(InstallOperation {
+                        file,
+                        temporary,
+                        backup: None,
+                    });
+                }
                 ConflictCheckResult::Unmanaged => {
                     // TODO: We could prompt the user here.
                     bail!(
@@ -31,7 +46,9 @@ pub(crate) fn install(directories: &HostDirectories, ledger: SystemLedger) -> an
         }
     }
 
-    // TODO: Create the journal (including the ledger).
+    // TODO: Drop mut on the journal.
+
+    // TODO: Write the journal to the file system.
     // TODO: Create the temporary files.
     // TODO: Create the backups.
     // TODO: Do the rename.
@@ -96,4 +113,22 @@ fn check_conflict(file: &TargetPath) -> ConflictCheckResult {
     }
 
     ConflictCheckResult::New
+}
+
+#[derive(Default)]
+struct Journal {
+    operations: Vec<InstallOperation>,
+}
+
+impl Journal {
+    fn new() -> Self {
+        Self::default()
+    }
+}
+
+#[expect(unused, reason = "TODO")]
+struct InstallOperation {
+    file: Box<TargetPath>,
+    temporary: Box<TargetPath>,
+    backup: Option<Box<TargetPath>>,
 }

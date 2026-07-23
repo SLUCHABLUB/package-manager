@@ -9,7 +9,7 @@ use std::path::MAIN_SEPARATOR_STR;
 use std::path::Path;
 use std::path::PathBuf;
 
-#[derive(Debug, Serialize)]
+#[derive(Eq, PartialEq, Hash, Debug, Serialize)]
 #[repr(transparent)]
 struct AbsolutePath(Path);
 
@@ -191,7 +191,7 @@ impl<'de> Deserialize<'de> for Box<HostPath> {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Eq, PartialEq, Hash, Debug, Serialize)]
 #[repr(transparent)]
 #[serde(transparent)]
 pub(crate) struct TargetPath(AbsolutePath);
@@ -232,10 +232,14 @@ impl TargetPath {
     }
 
     // This is deliberately not `AsRef` to avoid accidental misuse.
-    pub(crate) fn to_os_str(&self) -> &OsStr {
+    fn to_path(&self) -> &Path {
         let TargetPath(AbsolutePath(path)) = self;
+        path
+    }
 
-        path.as_os_str()
+    // This is deliberately not `AsRef` to avoid accidental misuse.
+    pub(crate) fn to_os_str(&self) -> &OsStr {
+        self.to_path().as_os_str()
     }
 
     /// Joins a relative path onto the end of this path.
@@ -251,6 +255,14 @@ impl TargetPath {
     pub(crate) fn with_root(&self, root: &HostPath) -> Box<HostPath> {
         let TargetPath(path) = self;
         root.with_suffix(path.to_relative())
+    }
+
+    pub(crate) fn with_extension(&self, extension: &str) -> Box<TargetPath> {
+        TargetPath::from_absolute_boxed(AbsolutePath::new_boxed_unchecked(
+            self.to_path()
+                .with_added_extension(extension)
+                .into_boxed_path(),
+        ))
     }
 }
 

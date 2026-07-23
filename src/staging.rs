@@ -17,6 +17,8 @@ pub(crate) fn stage_recipes(
         stage_single(recipe, directory, &mut ledger, state)?;
     }
 
+    // TODO: Stage the ledger.
+
     Ok(ledger)
 }
 
