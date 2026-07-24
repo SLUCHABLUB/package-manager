@@ -12,6 +12,7 @@ use fs_err as fs;
 use fs_err::create_dir_all;
 use serde::Deserialize;
 use serde::Serialize;
+use std::io;
 use std::path;
 use tracing::warn;
 use walkdir::WalkDir;
@@ -41,6 +42,10 @@ impl SystemLedger {
         self.data.recipes.push(recipe);
     }
 
+    pub(crate) fn contains(&self, file: &TargetPath) -> bool {
+        self.files().any(|(_recipe, owned)| owned == file)
+    }
+
     pub(crate) fn files(&self) -> impl Iterator<Item = (&str, &TargetPath)> {
         self.data
             .recipes
@@ -64,7 +69,11 @@ impl SystemLedger {
     pub(crate) fn read_from_host(target: &TargetDirectories) -> anyhow::Result<SystemLedger> {
         let mut ledger = SystemLedger::new(target);
 
-        let serialised = fs::read_to_string(ledger.path.to_host_path())?;
+        let serialised = match fs::read_to_string(ledger.path.to_host_path()) {
+            // We return an empty ledger if the file is not found.
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(ledger),
+            result => result?,
+        };
         ledger.data = toml::from_str(&serialised).context("deserialising the ledger")?;
 
         Ok(ledger)

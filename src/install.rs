@@ -33,17 +33,24 @@ pub(crate) fn install(
 
     // TODO: Try recover (if the journal exists).
 
-    let _old_ledger = SystemLedger::read_from_host(target);
+    let old_ledger = SystemLedger::read_from_host(target)?;
 
     let mut journal = Journal::new();
 
     for (recipe, file) in ledger.files() {
-        match check_conflict(file) {
+        match check_conflict(file, &old_ledger) {
             ConflictCheckResult::New => {
                 journal.operations.push(InstallOperation {
                     file: Box::from(file),
                     temporary: file.with_extension(TEMPORARY_EXTENSION),
                     backup: None,
+                });
+            }
+            ConflictCheckResult::Updated => {
+                journal.operations.push(InstallOperation {
+                    file: Box::from(file),
+                    temporary: file.with_extension(TEMPORARY_EXTENSION),
+                    backup: Some(file.with_extension(BACKUP_EXTENSION)),
                 });
             }
             ConflictCheckResult::Unmanaged => {
@@ -159,20 +166,25 @@ fn unlock(file: File) -> anyhow::Result<()> {
 enum ConflictCheckResult {
     /// The file did not exist in the last generation.
     New,
+    /// The file exited in the last generation and has not been modified.
+    Updated,
     /// The file existed on the system but was not managed by the package manager.
     Unmanaged,
 }
 
-fn check_conflict(file: &TargetPath) -> ConflictCheckResult {
-    let file = file.to_host_path();
+fn check_conflict(file: &TargetPath, old_ledger: &SystemLedger) -> ConflictCheckResult {
+    let host_path = file.to_host_path();
 
-    if file.exists() {
-        // TODO: Check if the file matches the old ledger.
-
-        return ConflictCheckResult::Unmanaged;
+    if host_path.exists() {
+        if old_ledger.contains(file) {
+            // TODO: Check if the hash matches.
+            ConflictCheckResult::Updated
+        } else {
+            ConflictCheckResult::Unmanaged
+        }
+    } else {
+        ConflictCheckResult::New
     }
-
-    ConflictCheckResult::New
 }
 
 fn ledger_install(ledger: &SystemLedger) -> InstallOperation {
