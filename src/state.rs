@@ -69,7 +69,7 @@ impl State {
         name: &str,
         version: &VersionRequirement,
     ) -> anyhow::Result<&Recipe> {
-        if let Some(recipe_name) = self.main_manifest.providers.get(name) {
+        if let Some(recipe_name) = self.main_manifest.provider(name) {
             return self.recipe_named(recipe_name);
         }
 
@@ -108,7 +108,7 @@ impl State {
     fn build_plan(&self) -> anyhow::Result<BuildPlan<'_>> {
         let mut plan = BuildPlan::new(self);
 
-        for (package, version) in &self.main_manifest.packages {
+        for (package, version) in self.main_manifest.packages() {
             plan.add_package(package, version)?;
         }
 

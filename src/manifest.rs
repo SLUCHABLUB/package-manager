@@ -9,28 +9,25 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::ops::Deref;
 use std::path::Path;
 use tracing::warn;
 
-// TODO: Make this opaque and add a transparent `ManifestData` type.
 #[derive(Debug)]
 pub(crate) struct Manifest {
     path: Box<HostPath>,
     parent_directory: Box<HostPath>,
 
+    /// A map from package name to recipe name.
+    providers: HashMap<Box<str>, Box<str>>,
+    recipe_directories: Box<[Box<Path>]>,
+
     data: ManifestData,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct ManifestData {
+struct ManifestData {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub packages: HashMap<Box<str>, VersionRequirement>,
-    /// A map from package name to recipe name.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub providers: HashMap<Box<str>, Box<str>>,
-    #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
-    pub recipe_directories: Box<[Box<Path>]>,
+    packages: HashMap<Box<str>, VersionRequirement>,
 }
 
 impl Manifest {
@@ -46,6 +43,8 @@ impl Manifest {
         Ok(Manifest {
             path,
             parent_directory,
+            providers: HashMap::new(),
+            recipe_directories: Box::new([]),
             data,
         })
     }
@@ -75,19 +74,21 @@ impl Manifest {
             })
             .flatten()
     }
+
+    pub(crate) fn provider(&self, package: &str) -> Option<&str> {
+        self.providers.get(package).map(Box::as_ref)
+    }
+
+    pub(crate) fn packages(&self) -> impl Iterator<Item = (&str, &VersionRequirement)> {
+        self.data
+            .packages
+            .iter()
+            .map(|(package, version)| (&**package, version))
+    }
 }
 
 impl Display for Manifest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "the manifest at `{}`", self.path)
-    }
-}
-
-// Is this a sin?
-impl Deref for Manifest {
-    type Target = ManifestData;
-
-    fn deref(&self) -> &Self::Target {
-        &self.data
     }
 }
