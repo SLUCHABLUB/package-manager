@@ -60,8 +60,8 @@ impl Manifest {
                             let entry = entry.ok_or_log()?;
                             let path = entry.path();
 
-                            // TODO: Don't try here, should be infallible.
-                            let path = HostPath::new(&path)?;
+                            let path = HostPath::new(&path)
+                                .expect("readdir output should be absolute for absolute input");
 
                             if entry.file_type().ok_or_log()?.is_dir() {
                                 warn!("skipping the directory `{path}`");
