@@ -39,7 +39,11 @@ enum Sandbox {
     None,
 }
 
-pub(crate) fn ensure_built(recipe: &Recipe, state: &State) -> anyhow::Result<()> {
+pub(crate) fn ensure_built(
+    recipe: &Recipe,
+    target_directories: &TargetDirectories,
+    state: &State,
+) -> anyhow::Result<()> {
     let name = &recipe.name;
 
     recipe
@@ -49,7 +53,7 @@ pub(crate) fn ensure_built(recipe: &Recipe, state: &State) -> anyhow::Result<()>
             |_| info!("using the cached target directory for the `{name}` recipe"),
             |into| {
                 info!("building the `{name}` recipe");
-                build(recipe, into, state)?;
+                build(recipe, into, target_directories, state)?;
                 info!("built the `{name}` recipe");
                 anyhow::Ok(())
             },
@@ -57,7 +61,12 @@ pub(crate) fn ensure_built(recipe: &Recipe, state: &State) -> anyhow::Result<()>
 }
 
 #[context("building the `{}` recipe", recipe.name)]
-fn build(recipe: &Recipe, target_directory: &HostPath, state: &State) -> anyhow::Result<()> {
+fn build(
+    recipe: &Recipe,
+    target_directory: &HostPath,
+    target_directories: &TargetDirectories,
+    state: &State,
+) -> anyhow::Result<()> {
     ensure_downloaded(recipe, state)?;
 
     let build_root = recipe.directories.build_root(recipe, state)?;
@@ -76,8 +85,9 @@ fn build(recipe: &Recipe, target_directory: &HostPath, state: &State) -> anyhow:
         build_root,
         working_directory,
         target_directory,
+        target_directories,
         &mut copies,
-    )?;
+    );
 
     let instruction = BuildInstruction {
         commands,
@@ -98,12 +108,10 @@ fn generate_commands(
     build_root: &HostPath,
     working_directory: &HostPath,
     target_directory: &HostPath,
+    target_directories: &TargetDirectories,
     copies: &mut Vec<FileTransfer<Box<HostPath>, Box<TargetPath>>>,
-) -> anyhow::Result<Vec<Command>> {
+) -> Vec<Command> {
     let mut commands = Vec::new();
-
-    // TODO: Take this as a parameter.
-    let target_directories = TargetDirectories::user()?;
 
     match &build.system {
         BuildSystem::None => (),
@@ -140,7 +148,7 @@ fn generate_commands(
             let artefact_path = cargo_target_directory
                 .with_suffix("release")
                 .with_suffix(&**binary);
-            let artefact_target_path = target_directories.executables.with_suffix(&**binary);
+            let artefact_target_path = target_directories.executables().with_suffix(&**binary);
 
             copies.push(FileTransfer {
                 from: artefact_path,
@@ -154,18 +162,21 @@ fn generate_commands(
 
             let mut configure = Command::new(&*build_root.with_suffix("configure"));
 
-            configure.arg(flag("prefix", &target_directories.prefix));
-            configure.arg(flag("bindir", target_directories.executables));
-            configure.arg(flag("sbindir", target_directories.system_executables));
-            configure.arg(flag("libexecdir", target_directories.internal_executables));
-            configure.arg(flag("datarootdir", target_directories.data));
-            configure.arg(flag("datadir", target_directories.data));
-            configure.arg(flag("sysconfdir", target_directories.configuration));
-            configure.arg(flag("sharedstatedir", target_directories.state));
-            configure.arg(flag("localstatedir", target_directories.state));
-            configure.arg(flag("runstatedir", target_directories.runtime));
-            configure.arg(flag("includedir", target_directories.headers));
-            configure.arg(flag("libdir", target_directories.libraries));
+            configure.arg(flag("prefix", target_directories.prefix()));
+            configure.arg(flag("bindir", target_directories.executables()));
+            configure.arg(flag("sbindir", target_directories.system_executables()));
+            configure.arg(flag(
+                "libexecdir",
+                target_directories.internal_executables(),
+            ));
+            configure.arg(flag("datarootdir", target_directories.data()));
+            configure.arg(flag("datadir", target_directories.data()));
+            configure.arg(flag("sysconfdir", target_directories.configuration()));
+            configure.arg(flag("sharedstatedir", target_directories.state()));
+            configure.arg(flag("localstatedir", target_directories.state()));
+            configure.arg(flag("runstatedir", target_directories.runtime()));
+            configure.arg(flag("includedir", target_directories.headers()));
+            configure.arg(flag("libdir", target_directories.libraries()));
 
             for flag in configure_flags {
                 configure.arg(&**flag);
@@ -191,7 +202,7 @@ fn generate_commands(
         }
     }
 
-    Ok(commands)
+    commands
 }
 
 fn flag(name: &str, path: &TargetPath) -> OsString {

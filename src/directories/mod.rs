@@ -3,14 +3,16 @@ mod target;
 
 use crate::HostPath;
 use const_str::concat;
-pub(crate) use host::HostDirectories;
 use once_cell::sync::Lazy as LazyLock;
 use std::env;
 use std::path::MAIN_SEPARATOR;
 use std::path::PathBuf;
-pub(crate) use target::TargetDirectories;
 use tracing::error;
 use tracing::warn;
+
+pub(crate) use host::HostDirectories;
+
+pub use target::TargetDirectories;
 
 const PREFIX: &str = ".local";
 

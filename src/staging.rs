@@ -2,32 +2,25 @@ use crate::HostPath;
 use crate::Recipe;
 use crate::State;
 use crate::SystemLedger;
+use crate::TargetDirectories;
 use anyhow::Context;
 use fn_error_context::context;
 use fs_err as fs;
-use fs_err::create_dir_all;
 
-pub(crate) fn stage_recipes(recipes: &[&Recipe], state: &State) -> anyhow::Result<SystemLedger> {
+pub(crate) fn stage_recipes(
+    recipes: &[&Recipe],
+    target_directories: &TargetDirectories,
+    state: &State,
+) -> anyhow::Result<SystemLedger> {
     let staging = &state.directories().staging;
 
-    let mut ledger = SystemLedger::new();
+    let mut ledger = SystemLedger::new(target_directories);
 
     for recipe in recipes {
         stage_single(recipe, staging, &mut ledger, state)?;
     }
 
-    let ledger_file = state
-        .directories()
-        .ledger_file
-        .to_target_path()
-        .with_root(staging);
-
-    if let Some(parent) = ledger_file.parent() {
-        create_dir_all(parent)?;
-    }
-
-    let serialised_ledger = toml::to_string(&ledger).context("serialising the ledger")?;
-    fs::write(ledger_file, serialised_ledger)?;
+    ledger.write_to_root(staging)?;
 
     Ok(ledger)
 }
@@ -39,11 +32,11 @@ fn stage_single(
     system_ledger: &mut SystemLedger,
     state: &State,
 ) -> anyhow::Result<()> {
-    let package_ledger = recipe.ledger.get().context("retrieving the ledger")?;
+    let recipe_ledger = recipe.ledger.get().context("retrieving the ledger")?;
 
     let target = recipe.directories.target(recipe, state)?.path();
 
-    for entry in package_ledger.files() {
+    for entry in &recipe_ledger.files {
         let source = entry.with_root(target);
         let destination = entry.with_root(directory);
 
@@ -54,11 +47,9 @@ fn stage_single(
         // TODO: Directory permissions?
         fs::create_dir_all(destination_parent)?;
         fs::copy(source, destination)?;
-
-        system_ledger
-            .recipes
-            .insert(recipe.name.clone(), package_ledger.clone());
     }
+
+    system_ledger.add_recipe(recipe_ledger.clone());
 
     Ok(())
 }

@@ -18,14 +18,14 @@ mod version;
 pub(crate) use build::ensure_built;
 pub(crate) use build_plan::BuildPlan;
 pub(crate) use dependencies::check_runtime_dependencies;
-pub(crate) use directories::TargetDirectories;
+pub(crate) use directories::HostDirectories;
 pub(crate) use download::IndexedFile;
 pub(crate) use download::detect_tarball_compression;
 pub(crate) use download::ensure_downloaded;
 pub(crate) use download::find_in_index;
 pub(crate) use download::resolve_commit;
 pub(crate) use install::install;
-pub(crate) use ledger::PackageLedger;
+pub(crate) use ledger::RecipeLedger;
 pub(crate) use ledger::SystemLedger;
 pub(crate) use manifest::Manifest;
 pub(crate) use path::HostPath;
@@ -45,6 +45,7 @@ pub(crate) use version::SemanticVersion;
 pub(crate) use version::Version;
 pub(crate) use version::VersionRequirement;
 
+pub use directories::TargetDirectories;
 pub use state::State;
 
 pub const PACKAGE_NAME: &str = env!("CARGO_PKG_NAME");

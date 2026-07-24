@@ -5,6 +5,7 @@ use anyhow::anyhow;
 use arguments::Arguments;
 use clap::Parser;
 use package_manager::State;
+use package_manager::TargetDirectories;
 use result::ResultExtension as _;
 
 fn main() {
@@ -28,7 +29,10 @@ fn try_main(arguments: Arguments) -> anyhow::Result<()> {
 
     let state = State::initialise()?;
 
-    state.install()?;
+    // TODO: Base this on the arguments.
+    let target_directories = TargetDirectories::user()?;
+
+    state.install(&target_directories)?;
 
     Ok(())
 }

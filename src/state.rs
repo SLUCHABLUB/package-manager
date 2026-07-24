@@ -1,9 +1,10 @@
 use crate::BuildPlan;
+use crate::HostDirectories;
 use crate::Manifest;
 use crate::Recipe;
 use crate::SystemLedger;
+use crate::TargetDirectories;
 use crate::VersionRequirement;
-use crate::directories::HostDirectories;
 use crate::install;
 use anyhow::bail;
 use fn_error_context::context;
@@ -34,23 +35,23 @@ impl State {
     }
 
     /// Downloads, builds, and installs all packages.
-    pub fn install(&self) -> anyhow::Result<()> {
-        let ledger = self.stage()?;
+    pub fn install(&self, into: &TargetDirectories) -> anyhow::Result<()> {
+        let ledger = self.stage(into)?;
 
-        install(&self.directories, &ledger)?;
+        install(&self.directories, &ledger, into)?;
 
         Ok(())
     }
 
     /// Downloads, builds and stages all packages.
-    pub(crate) fn stage(&self) -> anyhow::Result<SystemLedger> {
+    pub(crate) fn stage(&self, into: &TargetDirectories) -> anyhow::Result<SystemLedger> {
         match remove_dir_all(&self.directories.staging) {
             Ok(()) => (),
             Err(error) if error.kind() == io::ErrorKind::NotFound => (),
             result @ Err(_) => result?,
         }
 
-        self.build_plan()?.stage()
+        self.build_plan()?.stage(into)
     }
 
     pub(crate) fn directories(&self) -> &HostDirectories {

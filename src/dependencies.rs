@@ -1,6 +1,6 @@
 use crate::HostPath;
-use crate::PackageLedger;
 use crate::Recipe;
+use crate::RecipeLedger;
 use crate::ResultExtension as _;
 use crate::TargetPath;
 use crate::Version;
@@ -17,12 +17,13 @@ use std::io::Read;
 
 #[context("checking the runtime dependencies for the built `{}` recipe", recipe.name)]
 pub(crate) fn check_runtime_dependencies(
-    ledger: &PackageLedger,
+    ledger: &RecipeLedger,
     target: &HostPath,
     recipe: &Recipe,
 ) -> anyhow::Result<()> {
     let elves: Vec<_> = ledger
-        .files()
+        .files
+        .iter()
         .filter_map(|target_path| {
             let host_path = target_path.with_root(target);
 

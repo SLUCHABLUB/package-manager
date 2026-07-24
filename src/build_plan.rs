@@ -1,6 +1,7 @@
 use crate::Recipe;
 use crate::State;
 use crate::SystemLedger;
+use crate::TargetDirectories;
 use crate::VersionRequirement;
 use crate::prepare_to_install;
 use crate::stage_recipes;
@@ -47,18 +48,16 @@ impl<'state> BuildPlan<'state> {
         Ok(())
     }
 
-    pub(crate) fn prepare_to_install(&self) -> anyhow::Result<()> {
+    pub(crate) fn stage(
+        &self,
+        target_directories: &TargetDirectories,
+    ) -> anyhow::Result<SystemLedger> {
         // TODO: Parallelise.
         for recipe in &self.recipes {
-            prepare_to_install(recipe, self.state)?;
+            prepare_to_install(recipe, target_directories, self.state)?;
         }
 
-        Ok(())
-    }
-
-    pub(crate) fn stage(&self) -> anyhow::Result<SystemLedger> {
-        self.prepare_to_install()?;
-        let ledger = stage_recipes(&self.recipes, self.state)?;
+        let ledger = stage_recipes(&self.recipes, target_directories, self.state)?;
 
         Ok(ledger)
     }

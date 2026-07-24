@@ -1,52 +1,101 @@
 use crate::CacheDirectory;
 use crate::HostPath;
+use crate::PACKAGE_NAME;
 use crate::Recipe;
 use crate::State;
+use crate::TargetDirectories;
 use crate::TargetPath;
 use anyhow::Context;
+use const_str::join;
 use fn_error_context::context;
+use fs_err as fs;
+use fs_err::create_dir_all;
 use serde::Deserialize;
 use serde::Serialize;
-use std::collections::HashMap;
+use std::path;
 use tracing::warn;
 use walkdir::WalkDir;
 
-// TODO: Make this opaque.
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Debug)]
 pub(crate) struct SystemLedger {
-    #[serde(flatten)]
-    pub recipes: HashMap<Box<str>, PackageLedger>,
+    path: Box<TargetPath>,
+    data: SystemLedgerData,
 }
 
 impl SystemLedger {
-    pub(crate) fn new() -> SystemLedger {
-        SystemLedger::default()
+    pub(crate) fn new(target: &TargetDirectories) -> SystemLedger {
+        SystemLedger {
+            path: target.data().with_suffix(join!(
+                &[PACKAGE_NAME, "ledger.toml"],
+                path::MAIN_SEPARATOR_STR
+            )),
+            data: SystemLedgerData::default(),
+        }
+    }
+
+    pub(crate) fn path(&self) -> &TargetPath {
+        &self.path
+    }
+
+    pub(crate) fn add_recipe(&mut self, recipe: RecipeLedger) {
+        self.data.recipes.push(recipe);
     }
 
     pub(crate) fn files(&self) -> impl Iterator<Item = (&str, &TargetPath)> {
-        self.recipes
+        self.data
+            .recipes
             .iter()
-            .flat_map(|(recipe, ledger)| ledger.files().map(|file| (&**recipe, file)))
+            .flat_map(|ledger| ledger.files.iter().map(|file| (&*ledger.name, &**file)))
+    }
+
+    pub(crate) fn write_to_root(&self, root: &HostPath) -> anyhow::Result<()> {
+        let host_path = self.path.with_root(root);
+
+        if let Some(parent) = host_path.parent() {
+            create_dir_all(parent)?;
+        }
+
+        let serialised = toml::to_string(&self.data).context("serialising the ledger")?;
+        fs::write(host_path, serialised)?;
+
+        Ok(())
+    }
+
+    pub(crate) fn read_from_host(target: &TargetDirectories) -> anyhow::Result<SystemLedger> {
+        let mut ledger = SystemLedger::new(target);
+
+        let serialised = fs::read_to_string(ledger.path.to_host_path())?;
+        ledger.data = toml::from_str(&serialised).context("deserialising the ledger")?;
+
+        Ok(ledger)
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub(crate) struct PackageLedger(Box<[Box<TargetPath>]>);
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct SystemLedgerData {
+    recipes: Vec<RecipeLedger>,
+}
 
-impl PackageLedger {
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct RecipeLedger {
+    pub name: Box<str>,
+    pub files: Box<[Box<TargetPath>]>,
+}
+
+impl RecipeLedger {
     #[context(
         // TODO: Figure out how to do this cleanly.
         "creating a ledger of the target directory `{:?}`",
         recipe.directories.target(recipe, state).map(CacheDirectory::path)
     )]
-    pub(crate) fn new(recipe: &Recipe, state: &State) -> anyhow::Result<PackageLedger> {
+    pub(crate) fn new(recipe: &Recipe, state: &State) -> anyhow::Result<RecipeLedger> {
         let target_directory = recipe.directories.target(recipe, state)?;
         let Some(target_directory) = target_directory.as_populated() else {
             warn!(
                 "creating a ledger for the empty directory `{}`",
                 target_directory.path()
             );
-            return Ok(PackageLedger::default());
+            return Ok(RecipeLedger::empty(recipe.name.clone()));
         };
 
         let mut files = Vec::new();
@@ -64,11 +113,16 @@ impl PackageLedger {
             files.push(TargetPath::from_path_and_root(path, target_directory));
         }
 
-        Ok(PackageLedger(files.into_boxed_slice()))
+        Ok(RecipeLedger {
+            name: recipe.name.clone(),
+            files: files.into_boxed_slice(),
+        })
     }
 
-    pub(crate) fn files(&self) -> impl Iterator<Item = &TargetPath> {
-        let PackageLedger(files) = self;
-        files.iter().map(|file| &**file)
+    fn empty(recipe: Box<str>) -> RecipeLedger {
+        RecipeLedger {
+            name: recipe,
+            files: Box::new([]),
+        }
     }
 }

@@ -11,7 +11,7 @@ pub(crate) use download::Download;
 pub(crate) use download::DownloadLock;
 
 use crate::HostPath;
-use crate::PackageLedger;
+use crate::RecipeLedger;
 use crate::State;
 use crate::Version;
 use crate::VersionRequirement;
@@ -52,7 +52,7 @@ pub(crate) struct Recipe {
 
     // TODO: Move this out of here so it's ownership is tracked independently.
     #[serde(default, with = "once_cell_as_option")]
-    pub ledger: OnceCell<PackageLedger>,
+    pub ledger: OnceCell<RecipeLedger>,
 }
 
 impl Recipe {

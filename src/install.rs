@@ -1,8 +1,9 @@
+use crate::HostDirectories;
 use crate::PACKAGE_NAME;
 use crate::ResultExtension;
 use crate::SystemLedger;
+use crate::TargetDirectories;
 use crate::TargetPath;
-use crate::directories::HostDirectories;
 use anyhow::Context as _;
 use anyhow::bail;
 use const_str::concat;
@@ -21,12 +22,18 @@ const TEMPORARY_EXTENSION: &str = concat!(PACKAGE_NAME, '-', "temporary");
 const BACKUP_EXTENSION: &str = concat!(PACKAGE_NAME, '-', "backup");
 
 // TODO: Take an installation method parameter.
-pub(crate) fn install(directories: &HostDirectories, ledger: &SystemLedger) -> anyhow::Result<()> {
-    let lock = lock(directories)?;
+pub(crate) fn install(
+    host: &HostDirectories,
+    ledger: &SystemLedger,
+    target: &TargetDirectories,
+) -> anyhow::Result<()> {
+    let lock = lock(host)?;
 
     warn!("installing... don't touch the file system please");
 
     // TODO: Try recover (if the journal exists).
+
+    let _old_ledger = SystemLedger::read_from_host(target);
 
     let mut journal = Journal::new();
 
@@ -48,14 +55,14 @@ pub(crate) fn install(directories: &HostDirectories, ledger: &SystemLedger) -> a
         }
     }
 
-    journal.operations.push(ledger_install(directories));
+    journal.operations.push(ledger_install(ledger));
 
     let journal = journal;
 
     let serialised_journal = toml::to_string(&journal)?;
 
-    let journal_directory = File::open(&*directories.journal_directory)?;
-    let mut journal_file = File::create_new(&*directories.journal_file)?;
+    let journal_directory = File::open(&*host.journal_directory)?;
+    let mut journal_file = File::create_new(&*host.journal_file)?;
 
     // TODO: Don't use the try operator beyond this point until we've removed the journal.
 
@@ -65,7 +72,7 @@ pub(crate) fn install(directories: &HostDirectories, ledger: &SystemLedger) -> a
     journal_directory.sync_all()?;
 
     for operation in &journal.operations {
-        let staged = operation.file.with_root(&directories.staging);
+        let staged = operation.file.with_root(&host.staging);
         let destination = operation.temporary.to_host_path();
 
         if let Some(parent) = destination.parent() {
@@ -97,7 +104,7 @@ pub(crate) fn install(directories: &HostDirectories, ledger: &SystemLedger) -> a
     info!("installation complete; cleaning up");
 
     drop(journal_file);
-    remove_file(&*directories.journal_file)?;
+    remove_file(&*host.journal_file)?;
 
     journal_directory.sync_all()?;
     drop(journal_directory);
@@ -168,14 +175,13 @@ fn check_conflict(file: &TargetPath) -> ConflictCheckResult {
     ConflictCheckResult::New
 }
 
-fn ledger_install(directories: &HostDirectories) -> InstallOperation {
-    let should_backup = directories.ledger_file.exists();
-    let file = directories.ledger_file.to_target_path();
+fn ledger_install(ledger: &SystemLedger) -> InstallOperation {
+    let should_backup = ledger.path().to_host_path().exists();
 
     InstallOperation {
-        file: Box::from(file),
-        temporary: file.with_extension(TEMPORARY_EXTENSION),
-        backup: should_backup.then(|| file.with_extension(BACKUP_EXTENSION)),
+        file: Box::from(ledger.path()),
+        temporary: ledger.path().with_extension(TEMPORARY_EXTENSION),
+        backup: should_backup.then(|| ledger.path().with_extension(BACKUP_EXTENSION)),
     }
 }
 
