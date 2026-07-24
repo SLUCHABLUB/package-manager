@@ -2634,6 +2634,7 @@ dependencies = [
  "non-zero",
  "num_cpus",
  "once_cell",
+ "rapidhash",
  "reqwest",
  "rustls-rustcrypto",
  "serde",
@@ -2890,6 +2891,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom 0.2.17",
+]
+
+[[package]]
+name = "rapidhash"
+version = "4.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5da7e78a036ce858e8d55b7e7dc8ba3a88b78350fd2155d3591bbd966b58589e"
+dependencies = [
+ "rustversion",
 ]
 
 [[package]]

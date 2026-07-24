@@ -9,18 +9,15 @@ use fs_err::create_dir_all;
 use fs_err::read_dir;
 use fs_err::remove_dir_all;
 use once_cell::unsync::OnceCell;
+use rapidhash::v3::rapidhash_v3;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use std::fmt;
 use std::fmt::Debug;
-use std::hash::DefaultHasher;
-use std::hash::Hash;
-use std::hash::Hasher as _;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
-use tracing::warn;
 use url::Url;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -56,6 +53,7 @@ impl RecipeDirectories {
         recipe: &Recipe,
         state: &State,
     ) -> anyhow::Result<&HostPath> {
+        // TODO: Base this on the recipe hash.
         self.build_working
             .get_or_try_init(|| {
                 let working = state.directories().working.with_suffix(&*recipe.name);
@@ -138,23 +136,19 @@ impl RecipeDirectories {
     }
 }
 
+// TODO: Sprinkle in some logs.
 fn encode_url(url: &Url) -> String {
-    let human_readable_prefix = url
+    let hash = rapidhash_v3(url.as_str().as_bytes());
+
+    if let Some(human_readable_part) = url
         .path_segments()
         .and_then(Iterator::last)
         .or_else(|| url.domain())
-        .unwrap_or_else(|| {
-            warn!("could not retrieve a human readable component from the `{url}` url");
-            "weird-url"
-        });
-
-    let mut hasher = DefaultHasher::new();
-    url.as_str().hash(&mut hasher);
-
-    let injection_factor = hasher.finish();
-
-    // TODO: Add an extension?
-    format!("{human_readable_prefix}-{injection_factor}")
+    {
+        format!("{hash:x}-{human_readable_part}")
+    } else {
+        format!("{hash:x}")
+    }
 }
 
 fn make_empty_directory(directory: impl AsRef<Path>) -> anyhow::Result<()> {
