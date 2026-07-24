@@ -1,4 +1,5 @@
-# TODO: Check that a provider provides the needed package.
+[provides]
+bat = "0.26.1"
 
 [download.github]
 repository = "sharkdp/bat"

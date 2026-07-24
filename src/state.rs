@@ -7,6 +7,7 @@ use crate::TargetDirectories;
 use crate::VersionRequirement;
 use crate::install;
 use anyhow::bail;
+use anyhow::ensure;
 use fn_error_context::context;
 use fs_err::remove_dir_all;
 use once_cell::unsync::OnceCell;
@@ -70,7 +71,14 @@ impl State {
         version: &VersionRequirement,
     ) -> anyhow::Result<&Recipe> {
         if let Some(recipe_name) = self.main_manifest.provider(name) {
-            return self.recipe_named(recipe_name);
+            let recipe = self.recipe_named(recipe_name)?;
+
+            ensure!(
+                recipe.provides(name, version),
+                "the specified provider for the `{name}` package does not provide version {version}"
+            );
+
+            return Ok(recipe);
         }
 
         let mut recipes = self

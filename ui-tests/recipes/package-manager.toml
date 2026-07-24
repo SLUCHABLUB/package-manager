@@ -1,3 +1,6 @@
+[provides]
+package-manager = "any"
+
 [download.github]
 repository = "sluchablub/package-manager"
 version = "any"
