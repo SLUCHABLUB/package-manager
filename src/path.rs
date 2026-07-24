@@ -7,7 +7,6 @@ use std::mem::transmute;
 use std::ops::Deref;
 use std::path::MAIN_SEPARATOR_STR;
 use std::path::Path;
-use std::path::PathBuf;
 
 #[derive(Eq, PartialEq, Hash, Debug, Serialize)]
 #[repr(transparent)]
@@ -44,25 +43,8 @@ impl AbsolutePath {
 
         debug_assert!(suffix.is_relative());
 
-        // TODO: We should use `SEPARATORS_STR` since some weird OSes may have multiple separators.
-        let separator_size = usize::from(!prefix.ends_with(MAIN_SEPARATOR_STR));
-
-        let mut buffer = PathBuf::with_capacity(
-            prefix.as_os_str().len() + separator_size + suffix.as_os_str().len(),
-        );
-
-        buffer.as_mut_os_string().push(prefix.as_os_str());
-        buffer.push(suffix);
-
-        debug_assert_eq!(
-            buffer.as_os_str().len(),
-            prefix.as_os_str().len() + separator_size + suffix.as_os_str().len(),
-            "we estimated the capacity wrong",
-        );
-
-        debug_assert!(buffer.is_absolute());
-
-        Self::new_boxed_unchecked(Box::<Path>::from(buffer))
+        // The conversion to Box should be a no-op since the suffix is relative.
+        Self::new_boxed_unchecked(prefix.join(suffix).into_boxed_path())
     }
 
     fn to_relative(&self) -> &Path {
