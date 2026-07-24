@@ -58,7 +58,6 @@ impl RecipeDirectories {
     ) -> anyhow::Result<&HostPath> {
         self.build_working
             .get_or_try_init(|| {
-                // TODO: Put the cache subdirectories in the state struct.
                 let working = state.directories().working.with_suffix(&*recipe.name);
                 make_empty_directory(&*working)?;
                 Ok(working)
