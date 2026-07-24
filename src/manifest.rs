@@ -17,17 +17,18 @@ pub(crate) struct Manifest {
     path: Box<HostPath>,
     parent_directory: Box<HostPath>,
 
-    /// A map from package name to recipe name.
-    providers: HashMap<Box<str>, Box<str>>,
-    recipe_directories: Box<[Box<Path>]>,
-
     data: ManifestData,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ManifestData {
+    #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
+    recipe_directories: Box<[Box<Path>]>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     packages: HashMap<Box<str>, VersionRequirement>,
+    /// A map from package name to recipe name.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    providers: HashMap<Box<str>, Box<str>>,
 }
 
 impl Manifest {
@@ -43,14 +44,13 @@ impl Manifest {
         Ok(Manifest {
             path,
             parent_directory,
-            providers: HashMap::new(),
-            recipe_directories: Box::new([]),
             data,
         })
     }
 
     pub(crate) fn read_recipes(&self) -> impl Iterator<Item = Recipe> {
-        self.recipe_directories
+        self.data
+            .recipe_directories
             .iter()
             .filter_map(|directory| {
                 Some(
@@ -76,7 +76,7 @@ impl Manifest {
     }
 
     pub(crate) fn provider(&self, package: &str) -> Option<&str> {
-        self.providers.get(package).map(Box::as_ref)
+        self.data.providers.get(package).map(Box::as_ref)
     }
 
     pub(crate) fn packages(&self) -> impl Iterator<Item = (&str, &VersionRequirement)> {
