@@ -94,6 +94,8 @@ pub(crate) fn install(directories: &HostDirectories, ledger: &SystemLedger) -> a
         fs::rename(temporary, destination)?;
     }
 
+    info!("installation complete; cleaning up");
+
     drop(journal_file);
     remove_file(&*directories.journal_file)?;
 
@@ -109,12 +111,10 @@ pub(crate) fn install(directories: &HostDirectories, ledger: &SystemLedger) -> a
         remove_file(backup).context("removing backups").ok_or_log();
     }
 
-    warn!("not actually installing :P");
-
     // If this fails, the kernel will release the lock.
     unlock(lock)?;
 
-    info!("done installing; you may touch the file system");
+    info!("cleaning complete; you may touch the file system");
 
     Ok(())
 }
