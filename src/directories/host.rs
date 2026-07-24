@@ -24,6 +24,9 @@ pub(crate) struct HostDirectories {
     pub(crate) journal_file: Box<HostPath>,
     /// The directory containing the journal file.
     pub(crate) journal_directory: Box<HostPath>,
+
+    // TODO: This should be based on the install location.
+    pub(crate) ledger_file: Box<HostPath>,
 }
 
 impl HostDirectories {
@@ -62,6 +65,10 @@ impl HostDirectories {
                 path::MAIN_SEPARATOR_STR
             )),
             journal_directory: XDG_DATA_HOME.as_ref()?.with_suffix(PACKAGE_NAME),
+            ledger_file: XDG_DATA_HOME.as_ref()?.with_suffix(join!(
+                &[PACKAGE_NAME, "ledger.toml"],
+                path::MAIN_SEPARATOR_STR
+            )),
         })
     }
 }

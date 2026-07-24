@@ -22,15 +22,16 @@ impl SystemLedger {
     pub(crate) fn new() -> SystemLedger {
         SystemLedger::default()
     }
+
+    pub(crate) fn files(&self) -> impl Iterator<Item = (&str, &TargetPath)> {
+        self.recipes
+            .iter()
+            .flat_map(|(recipe, ledger)| ledger.files().map(|file| (&**recipe, file)))
+    }
 }
 
-// TODO: Make this opaque.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub(crate) struct PackageLedger {
-    // TODO: Make this a map (list of entries!), from file to hash.
-    #[serde(flatten)]
-    pub files: Box<[Box<TargetPath>]>,
-}
+pub(crate) struct PackageLedger(Box<[Box<TargetPath>]>);
 
 impl PackageLedger {
     #[context(
@@ -63,8 +64,11 @@ impl PackageLedger {
             files.push(TargetPath::from_path_and_root(path, target_directory));
         }
 
-        Ok(PackageLedger {
-            files: files.into_boxed_slice(),
-        })
+        Ok(PackageLedger(files.into_boxed_slice()))
+    }
+
+    pub(crate) fn files(&self) -> impl Iterator<Item = &TargetPath> {
+        let PackageLedger(files) = self;
+        files.iter().map(|file| &**file)
     }
 }

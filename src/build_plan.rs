@@ -1,4 +1,3 @@
-use crate::HostPath;
 use crate::Recipe;
 use crate::State;
 use crate::SystemLedger;
@@ -57,9 +56,9 @@ impl<'state> BuildPlan<'state> {
         Ok(())
     }
 
-    pub(crate) fn stage(&self, into: &HostPath) -> anyhow::Result<SystemLedger> {
+    pub(crate) fn stage(&self) -> anyhow::Result<SystemLedger> {
         self.prepare_to_install()?;
-        let ledger = stage_recipes(&self.recipes, into, self.state)?;
+        let ledger = stage_recipes(&self.recipes, self.state)?;
 
         Ok(ledger)
     }

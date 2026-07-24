@@ -17,11 +17,11 @@ use std::io::Write;
 use tracing::info;
 use tracing::warn;
 
-const TYEMPORARY_EXTENSION: &str = concat!(PACKAGE_NAME, '-', "temporary");
-//const BACKUP_EXTENSION: &str = concat!(PACKAGE_NAME, '-', "backup");
+const TEMPORARY_EXTENSION: &str = concat!(PACKAGE_NAME, '-', "temporary");
+const BACKUP_EXTENSION: &str = concat!(PACKAGE_NAME, '-', "backup");
 
 // TODO: Take an installation method parameter.
-pub(crate) fn install(directories: &HostDirectories, ledger: SystemLedger) -> anyhow::Result<()> {
+pub(crate) fn install(directories: &HostDirectories, ledger: &SystemLedger) -> anyhow::Result<()> {
     let lock = lock(directories)?;
 
     warn!("installing... don't touch the file system please");
@@ -30,28 +30,25 @@ pub(crate) fn install(directories: &HostDirectories, ledger: SystemLedger) -> an
 
     let mut journal = Journal::new();
 
-    for (recipe, ledger) in ledger.recipes {
-        for file in ledger.files {
-            // TODO: Record this in the journal.
-            match check_conflict(&file) {
-                ConflictCheckResult::New => {
-                    let temporary = file.with_extension(TYEMPORARY_EXTENSION);
-
-                    journal.operations.push(InstallOperation {
-                        file,
-                        temporary,
-                        backup: None,
-                    });
-                }
-                ConflictCheckResult::Unmanaged => {
-                    // TODO: We could prompt the user here.
-                    bail!(
-                        "the installation of the `{recipe}` recipe would override the unmanaged file at `{file}`"
-                    );
-                }
+    for (recipe, file) in ledger.files() {
+        match check_conflict(file) {
+            ConflictCheckResult::New => {
+                journal.operations.push(InstallOperation {
+                    file: Box::from(file),
+                    temporary: file.with_extension(TEMPORARY_EXTENSION),
+                    backup: None,
+                });
+            }
+            ConflictCheckResult::Unmanaged => {
+                // TODO: We could prompt the user here.
+                bail!(
+                    "the installation of the `{recipe}` recipe would override the unmanaged file at `{file}`"
+                );
             }
         }
     }
+
+    journal.operations.push(ledger_install(directories));
 
     let journal = journal;
 
@@ -169,6 +166,17 @@ fn check_conflict(file: &TargetPath) -> ConflictCheckResult {
     }
 
     ConflictCheckResult::New
+}
+
+fn ledger_install(directories: &HostDirectories) -> InstallOperation {
+    let should_backup = directories.ledger_file.exists();
+    let file = directories.ledger_file.to_target_path();
+
+    InstallOperation {
+        file: Box::from(file),
+        temporary: file.with_extension(TEMPORARY_EXTENSION),
+        backup: should_backup.then(|| file.with_extension(BACKUP_EXTENSION)),
+    }
 }
 
 #[derive(Default, Serialize)]

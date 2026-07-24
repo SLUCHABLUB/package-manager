@@ -37,22 +37,20 @@ impl State {
     pub fn install(&self) -> anyhow::Result<()> {
         let ledger = self.stage()?;
 
-        install(&self.directories, ledger)?;
+        install(&self.directories, &ledger)?;
 
         Ok(())
     }
 
     /// Downloads, builds and stages all packages.
     pub(crate) fn stage(&self) -> anyhow::Result<SystemLedger> {
-        let staging = &*self.directories.staging;
-
-        match remove_dir_all(staging) {
+        match remove_dir_all(&self.directories.staging) {
             Ok(()) => (),
             Err(error) if error.kind() == io::ErrorKind::NotFound => (),
             result @ Err(_) => result?,
         }
 
-        self.build_plan()?.stage(staging)
+        self.build_plan()?.stage()
     }
 
     pub(crate) fn directories(&self) -> &HostDirectories {

@@ -281,6 +281,14 @@ impl Display for TargetPath {
     }
 }
 
+impl From<&TargetPath> for Box<TargetPath> {
+    fn from(path: &TargetPath) -> Self {
+        TargetPath::from_absolute_boxed(AbsolutePath::new_boxed_unchecked(Box::from(
+            path.to_path(),
+        )))
+    }
+}
+
 impl<'de> Deserialize<'de> for Box<TargetPath> {
     fn deserialize<D>(deserialiser: D) -> Result<Self, D::Error>
     where
