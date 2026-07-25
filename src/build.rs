@@ -44,23 +44,21 @@ pub(crate) fn ensure_built(
     target_directories: &TargetDirectories,
     state: &State,
 ) -> anyhow::Result<()> {
-    let name = &recipe.name;
-
     recipe
-        .directories
+        .directories()
         .target(recipe, state)?
         .as_populated_then_run_or_populate_with(
-            |_| info!("using the cached target directory for the `{name}` recipe"),
+            |_| info!("using the cached target directory for {recipe}"),
             |into| {
-                info!("building the `{name}` recipe");
+                info!("building {recipe}");
                 build(recipe, into, target_directories, state)?;
-                info!("built the `{name}` recipe");
+                info!("built {recipe}");
                 anyhow::Ok(())
             },
         )
 }
 
-#[context("building the `{}` recipe", recipe.name)]
+#[context("building {recipe}")]
 fn build(
     recipe: &Recipe,
     target_directory: &HostPath,
@@ -69,10 +67,10 @@ fn build(
 ) -> anyhow::Result<()> {
     ensure_downloaded(recipe, state)?;
 
-    let build_root = recipe.directories.build_root(recipe, state)?;
-    let working_directory = recipe.directories.build_working(recipe, state)?;
+    let build_root = recipe.directories().build_root(recipe, state)?;
+    let working_directory = recipe.directories().build_working(recipe, state)?;
 
-    for (dependency, version) in &recipe.build.dependencies.versions {
+    for (dependency, version) in &recipe.build_data().dependencies.versions {
         // TODO
         warn!("not checking the build dependency of `{dependency}` version {version}");
     }
@@ -81,7 +79,7 @@ fn build(
     let mut copies = Vec::new();
 
     let commands = generate_commands(
-        &recipe.build,
+        recipe.build_data(),
         build_root,
         working_directory,
         target_directory,

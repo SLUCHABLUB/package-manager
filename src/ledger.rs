@@ -101,16 +101,16 @@ impl RecipeLedger {
     #[context(
         // TODO: Figure out how to do this cleanly.
         "creating a ledger of the target directory `{:?}`",
-        recipe.directories.target(recipe, state).map(CacheDirectory::path)
+        recipe.directories().target(recipe, state).map(CacheDirectory::path)
     )]
     pub(crate) fn new(recipe: &Recipe, state: &State) -> anyhow::Result<RecipeLedger> {
-        let target_directory = recipe.directories.target(recipe, state)?;
+        let target_directory = recipe.directories().target(recipe, state)?;
         let Some(target_directory) = target_directory.as_populated() else {
             warn!(
                 "creating a ledger for the empty directory `{}`",
                 target_directory.path()
             );
-            return Ok(RecipeLedger::empty(recipe.name.clone()));
+            return Ok(RecipeLedger::empty(Box::from(recipe.name())));
         };
 
         let mut hashes = HashMap::new();
@@ -132,7 +132,7 @@ impl RecipeLedger {
         }
 
         Ok(RecipeLedger {
-            name: recipe.name.clone(),
+            name: Box::from(recipe.name()),
             hashes,
         })
     }

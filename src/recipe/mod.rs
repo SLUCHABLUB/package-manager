@@ -15,44 +15,28 @@ use crate::RecipeLedger;
 use crate::State;
 use crate::Version;
 use crate::VersionRequirement;
-use crate::serde::once_cell_as_option;
 use anyhow::Context;
-use anyhow::bail;
 use fn_error_context::context;
-use fs_err::read;
+use fs_err::read_to_string;
 use once_cell::unsync::OnceCell;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_with::serde_as;
 use std::collections::HashMap;
+use std::fmt::Display;
 
-// TODO: Split this into a "simple" and "cached" type.
-// TODO: Make this opaque.
-#[serde_as]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub(crate) struct Recipe {
-    #[serde(skip)]
-    pub name: Box<str>,
+    // TODO: Make this an OsStr.
+    name: Box<str>,
 
-    #[serde(default)]
-    pub provides: HashMap<Box<str>, Version>,
+    data: RecipeData,
 
-    #[serde(default)]
-    pub download: Download,
-    #[serde(default)]
-    pub build: Build,
-
-    #[serde(default)]
-    pub dependencies: Dependencies,
-
-    #[serde(default, with = "once_cell_as_option")]
-    pub download_lock: OnceCell<DownloadLock>,
-    #[serde(default)]
-    pub directories: RecipeDirectories,
+    download_lock: OnceCell<DownloadLock>,
+    directories: RecipeDirectories,
 
     // TODO: Move this out of here so it's ownership is tracked independently.
-    #[serde(default, with = "once_cell_as_option")]
-    pub ledger: OnceCell<RecipeLedger>,
+    ledger: OnceCell<RecipeLedger>,
 }
 
 impl Recipe {
@@ -64,32 +48,70 @@ impl Recipe {
         let file_name = file_name.to_string_lossy();
         let file_name = file_name.strip_suffix(".toml").unwrap_or(&file_name);
 
-        let bytes = read(path)?;
-        let mut recipe: Recipe = toml::from_slice(&bytes)?;
+        let data = read_to_string(path)?;
+        let data: RecipeData = toml::from_str(&data)?;
 
-        if recipe.download_lock.get().is_some() {
-            bail!("a normal recipe may not provide a download lock");
-        }
-        if recipe.ledger.get().is_some() {
-            bail!("a normal recipe may not provide a ledger");
-        }
-
-        recipe.name = Box::from(file_name);
-
-        Ok(recipe)
+        Ok(Recipe {
+            name: Box::from(file_name),
+            data,
+            download_lock: OnceCell::new(),
+            directories: RecipeDirectories::default(),
+            ledger: OnceCell::new(),
+        })
     }
 
     pub(crate) fn provides(&self, package_name: &str, version: &VersionRequirement) -> bool {
-        self.provides
+        self.data
+            .provides
             .get(package_name)
             .is_some_and(|provided_version| provided_version.satisfies(version))
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub(crate) fn build_data(&self) -> &Build {
+        &self.data.build
+    }
+
+    pub(crate) fn dependencies(&self) -> &Dependencies {
+        &self.data.dependencies
     }
 
     #[context("locking the download for the `{}` recipe", self.name)]
     pub(crate) fn download_lock(&self, state: &State) -> anyhow::Result<&DownloadLock> {
         self.download_lock
-            .get_or_try_init(|| self.download.lock(&self.directories, state))
+            .get_or_try_init(|| self.data.download.lock(&self.directories, state))
     }
+
+    pub(crate) fn directories(&self) -> &RecipeDirectories {
+        &self.directories
+    }
+
+    pub(crate) fn ledger(&self) -> &OnceCell<RecipeLedger> {
+        &self.ledger
+    }
+}
+
+impl Display for Recipe {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "the `{}` recipe", self.name)
+    }
+}
+
+#[serde_as]
+#[derive(Debug, Serialize, Deserialize)]
+struct RecipeData {
+    provides: HashMap<Box<str>, Version>,
+
+    #[serde(default)]
+    download: Download,
+    #[serde(default)]
+    build: Build,
+
+    #[serde(default)]
+    dependencies: Dependencies,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]

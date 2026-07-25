@@ -67,7 +67,7 @@ impl RecipeDirectories {
     pub(crate) fn build_root(&self, recipe: &Recipe, state: &State) -> anyhow::Result<&HostPath> {
         let cached = self.build_root.get_or_try_init(|| {
             recipe
-                .build
+                .build_data()
                 .directory
                 .as_ref()
                 .map(|suffix| {

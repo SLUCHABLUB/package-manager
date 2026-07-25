@@ -15,7 +15,7 @@ use goblin::elf64::header::SELFMAG;
 use std::collections::HashMap;
 use std::io::Read;
 
-#[context("checking the runtime dependencies for the built `{}` recipe", recipe.name)]
+#[context("checking the runtime dependencies for {recipe}")]
 pub(crate) fn check_runtime_dependencies(
     ledger: &RecipeLedger,
     target: &HostPath,
@@ -49,7 +49,7 @@ pub(crate) fn check_runtime_dependencies(
                 continue;
             }
 
-            let Some(declared_version) = recipe.dependencies.versions.get(name) else {
+            let Some(declared_version) = recipe.dependencies().versions.get(name) else {
                 bail!(
                     "the file `{}` requires the library `{name}` with version {needed_version} but it was not declared as a dependency",
                     elf.path,

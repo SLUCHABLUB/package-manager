@@ -39,7 +39,7 @@ impl<'state> BuildPlan<'state> {
 
         let recipe = self.state.recipe_for_package(name, version)?;
 
-        for (dependency, version) in &recipe.dependencies.versions {
+        for (dependency, version) in &recipe.dependencies().versions {
             self.add_package(dependency, version)?;
         }
 

@@ -18,28 +18,26 @@ pub(crate) use tar::detect_tarball_compression;
 pub(crate) use tar::split_tarball_file_name;
 
 pub(crate) fn ensure_downloaded(recipe: &Recipe, state: &State) -> anyhow::Result<()> {
-    let name = &recipe.name;
-
     recipe
-        .directories
+        .directories()
         .source(recipe.download_lock(state)?, state)?
         .as_populated_then_run_or_populate_with(
-            |_| info!("using the cached source directory for the `{name}` recipe"),
+            |_| info!("using the cached source directory for {recipe}"),
             |into| {
-                info!("downloading the source code for the `{name}` recipe");
+                info!("downloading the source code for {recipe}");
                 download(recipe, into, state)?;
-                info!("downloaded the source code for the `{name}` recipe");
+                info!("downloaded the source code for {recipe}");
                 anyhow::Ok(())
             },
         )
 }
 
-#[context("downloading the source code for the `{}` recipe", recipe.name)]
+#[context("downloading the source code for {recipe}")]
 fn download(recipe: &Recipe, source_directory: &HostPath, state: &State) -> anyhow::Result<()> {
     match recipe.download_lock(state)? {
         DownloadLock::None => (),
         DownloadLock::Git { url, commit } => {
-            download_git(url, *commit, source_directory, &recipe.directories, state)?;
+            download_git(url, *commit, source_directory, recipe.directories(), state)?;
         }
         DownloadLock::Tarball {
             virtual_url: _,

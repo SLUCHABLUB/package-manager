@@ -99,7 +99,7 @@ impl State {
     }
 
     fn recipe_named(&self, name: &str) -> anyhow::Result<&Recipe> {
-        let mut recipes = self.recipes().filter(|recipe| &*recipe.name == name);
+        let mut recipes = self.recipes().filter(|recipe| recipe.name() == name);
 
         let Some(recipe) = recipes.next() else {
             bail!("no recipe named `{name}`");

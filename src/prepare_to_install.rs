@@ -15,16 +15,16 @@ pub(crate) fn prepare_to_install<'state>(
     ensure_built(recipe, into, state)?;
 
     let ledger = recipe
-        .ledger
+        .ledger()
         .get_or_try_init(|| RecipeLedger::new(recipe, state))?;
 
     check_runtime_dependencies(
         ledger,
-        recipe.directories.target(recipe, state)?.path(),
+        recipe.directories().target(recipe, state)?.path(),
         recipe,
     )?;
 
-    info!("the `{}` recipe is ready to install", recipe.name);
+    info!("{recipe} is ready to install");
 
     Ok(ledger)
 }
