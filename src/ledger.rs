@@ -14,6 +14,7 @@ use fs_err::create_dir_all;
 use rapidhash::v3::rapidhash_v3_file;
 use serde::Deserialize;
 use serde::Serialize;
+use show_option::ShowOption as _;
 use std::collections::HashMap;
 use std::io;
 use std::path;
@@ -99,9 +100,13 @@ pub(crate) struct RecipeLedger {
 
 impl RecipeLedger {
     #[context(
-        // TODO: Figure out how to do this cleanly.
-        "creating a ledger of the target directory `{:?}`",
-        recipe.directories().target(recipe, state).map(CacheDirectory::path)
+        "creating a ledger of {}",
+        recipe
+            .directories()
+            .target(recipe, state)
+            .map(CacheDirectory::path)
+            .ok()
+            .show_surrounded_or("the target directory `", '`', recipe)
     )]
     pub(crate) fn new(recipe: &Recipe, state: &State) -> anyhow::Result<RecipeLedger> {
         let target_directory = recipe.directories().target(recipe, state)?;

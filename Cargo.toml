@@ -32,6 +32,12 @@ url = { version = "2.5.8", features = ["serde"] }
 version-compare = "0.2.1"
 walkdir = "2.5.0"
 
+[dependencies.show-option]
+version = "0.2.0"
+default-features = false
+# TODO: Remove when the dependency doesn't fail to build without it.
+features = ["macro"]
+
 [lints.clippy]
 pedantic = { level = "deny", priority = -1 }
 

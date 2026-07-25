@@ -2383,6 +2383,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "lazy_format"
+version = "2.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e479e99b287d578ed5f6cd4c92cdf48db219088adb9c5b14f7c155b71dfba792"
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2639,6 +2645,7 @@ dependencies = [
  "rustls-rustcrypto",
  "serde",
  "serde_with",
+ "show-option",
  "tar",
  "toml",
  "tracing",
@@ -3432,6 +3439,15 @@ name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
+
+[[package]]
+name = "show-option"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9280e580b9ef1357f96294fb79e645398d24e17cbf525e9184ecbeb13eef457"
+dependencies = [
+ "lazy_format",
+]
 
 [[package]]
 name = "signal-hook"
