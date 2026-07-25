@@ -18,6 +18,7 @@ use std::fmt::Debug;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
+use tracing::warn;
 use url::Url;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -136,7 +137,6 @@ impl RecipeDirectories {
     }
 }
 
-// TODO: Sprinkle in some logs.
 fn encode_url(url: &Url) -> String {
     let hash = rapidhash_v3(url.as_str().as_bytes());
 
@@ -147,6 +147,7 @@ fn encode_url(url: &Url) -> String {
     {
         format!("{hash:x}-{human_readable_part}")
     } else {
+        warn!("could not determine a human readable component of `{url}`");
         format!("{hash:x}")
     }
 }
