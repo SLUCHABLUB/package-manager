@@ -64,6 +64,9 @@ pub(crate) fn install(
                 // TODO: We could prompt the user here.
                 bail!("the file at `{file}` has been modified since the last installation");
             }
+            ConflictCheckResult::RemainsSame => {
+                // No update needed.
+            }
         }
     }
 
@@ -177,6 +180,8 @@ enum ConflictCheckResult {
     Unmanaged,
     /// The file is managed but was modified since the last generation.
     Modified,
+    /// The file was the same in the last generation.
+    RemainsSame,
 }
 
 fn check_conflict(
@@ -187,13 +192,16 @@ fn check_conflict(
     let host_path = file.to_host_path();
 
     Ok(if host_path.exists() {
-        if old_ledger.contains(file) {
-            let old_file = File::open(file.to_host_path())?;
-            let old_hash = rapidhash_v3_file(old_file)?;
+        if let Some(old_hash) = old_ledger.hash(file) {
+            let existing_file = File::open(host_path)?;
+            let existing_hash = rapidhash_v3_file(existing_file)?;
 
-            // TODO(bug): We are comparing the wrong hashes.
-            if old_hash == new_hash {
-                ConflictCheckResult::Updated
+            if old_hash == existing_hash {
+                if old_hash == new_hash {
+                    ConflictCheckResult::RemainsSame
+                } else {
+                    ConflictCheckResult::Updated
+                }
             } else {
                 ConflictCheckResult::Modified
             }

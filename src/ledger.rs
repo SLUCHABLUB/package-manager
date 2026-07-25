@@ -46,8 +46,9 @@ impl SystemLedger {
         self.data.recipes.push(recipe);
     }
 
-    pub(crate) fn contains(&self, file: &TargetPath) -> bool {
-        self.files().any(|(_recipe, path, _hash)| path == file)
+    pub(crate) fn hash(&self, file: &TargetPath) -> Option<u64> {
+        self.files()
+            .find_map(|(_recipe, path, hash)| (path == file).then_some(hash))
     }
 
     pub(crate) fn files(&self) -> impl Iterator<Item = (&str, &TargetPath, u64)> {
