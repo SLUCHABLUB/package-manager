@@ -11,11 +11,9 @@ use serde::Deserialize;
 use serde::Serialize;
 use url::Url;
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Download {
-    #[default]
-    #[serde(skip)]
     None,
     Github {
         repository: Box<str>,

@@ -4,7 +4,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct Build {
     #[serde(default)]
     pub dependencies: Dependencies,
@@ -18,11 +18,9 @@ pub(crate) struct Build {
     pub system: BuildSystem,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "system", rename_all = "snake_case")]
 pub(crate) enum BuildSystem {
-    #[default]
-    #[serde(skip)]
     None,
     Cargo {
         // TODO: locked: bool,

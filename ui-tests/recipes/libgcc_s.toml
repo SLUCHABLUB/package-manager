@@ -1,2 +1,5 @@
 # Cheating to get rid of the error messages.
 version = "1"
+
+download = "none"
+build.system = "none"

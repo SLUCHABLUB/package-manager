@@ -1,4 +1,7 @@
 version = "6"
 
+download = "none"
+build.system = "none"
+
 [dependencies]
 glibc = "any"

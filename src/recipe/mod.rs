@@ -106,10 +106,7 @@ impl Display for Recipe {
 struct RecipeData {
     version: Version,
 
-    // TODO: Make these non-optional.
-    #[serde(default)]
     download: Download,
-    #[serde(default)]
     build: Build,
 
     #[serde(default)]
