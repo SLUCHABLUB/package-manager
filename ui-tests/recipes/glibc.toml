@@ -1,6 +1,4 @@
-[provides]
-libc = "6"
-libm = "6"
+version = "2.43"
 
 [download]
 

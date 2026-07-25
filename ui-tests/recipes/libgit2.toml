@@ -1,5 +1,4 @@
-[provides]
-libgit2 = "1.9"
+version = "1.9"
 
 [download.github]
 repository = "libgit2/libgit2"

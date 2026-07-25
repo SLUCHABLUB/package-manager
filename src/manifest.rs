@@ -26,9 +26,6 @@ struct ManifestData {
     recipe_directories: Box<[Box<Path>]>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     packages: HashMap<Box<str>, VersionRequirement>,
-    /// A map from package name to recipe name.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    providers: HashMap<Box<str>, Box<str>>,
 }
 
 impl Manifest {
@@ -73,10 +70,6 @@ impl Manifest {
                 )
             })
             .flatten()
-    }
-
-    pub(crate) fn provider(&self, package: &str) -> Option<&str> {
-        self.data.providers.get(package).map(Box::as_ref)
     }
 
     pub(crate) fn packages(&self) -> impl Iterator<Item = (&str, &VersionRequirement)> {

@@ -7,7 +7,6 @@ use crate::TargetDirectories;
 use crate::VersionRequirement;
 use crate::install;
 use anyhow::bail;
-use anyhow::ensure;
 use fn_error_context::context;
 use fs_err::remove_dir_all;
 use once_cell::unsync::OnceCell;
@@ -70,20 +69,9 @@ impl State {
         name: &str,
         version: &VersionRequirement,
     ) -> anyhow::Result<&Recipe> {
-        if let Some(recipe_name) = self.main_manifest.provider(name) {
-            let recipe = self.recipe_named(recipe_name)?;
-
-            ensure!(
-                recipe.provides(name, version),
-                "the specified provider for the `{name}` package does not provide version {version}"
-            );
-
-            return Ok(recipe);
-        }
-
         let mut recipes = self
             .recipes()
-            .filter(|recipe| recipe.provides(name, version));
+            .filter(|recipe| recipe.name() == name && recipe.version().satisfies(version));
 
         let Some(recipe) = recipes.next() else {
             bail!("no recipe provides `{name}` version {version}");
@@ -93,20 +81,6 @@ impl State {
             bail!(
                 "multiple recipes provide `{name}` version {version}, please select a provider in the manifest"
             );
-        }
-
-        Ok(recipe)
-    }
-
-    fn recipe_named(&self, name: &str) -> anyhow::Result<&Recipe> {
-        let mut recipes = self.recipes().filter(|recipe| recipe.name() == name);
-
-        let Some(recipe) = recipes.next() else {
-            bail!("no recipe named `{name}`");
-        };
-
-        if recipes.next().is_some() {
-            bail!("multiple recipes are named `{name}`");
         }
 
         Ok(recipe)

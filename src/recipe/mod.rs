@@ -27,8 +27,8 @@ use std::fmt::Display;
 
 #[derive(Debug)]
 pub(crate) struct Recipe {
-    // TODO: Make this an OsStr.
     name: Box<str>,
+    path: Box<HostPath>,
 
     data: RecipeData,
 
@@ -40,19 +40,23 @@ pub(crate) struct Recipe {
 }
 
 impl Recipe {
+    // TODO: Take the path owned.
     #[context("parsing the recipe at `{}`", path.display())]
     pub(crate) fn read_from(path: &HostPath) -> anyhow::Result<Recipe> {
-        let file_name = path
-            .file_name()
-            .context("determining the recipe's file name")?;
-        let file_name = file_name.to_string_lossy();
-        let file_name = file_name.strip_suffix(".toml").unwrap_or(&file_name);
+        let file_name = path.file_name().context("determining the file name")?;
+        let file_name = file_name
+            .to_str()
+            .context("parsing the file name as utf-8")?;
+        let file_name = file_name
+            .strip_suffix(".toml")
+            .context("stripping the `.toml` extension")?;
 
         let data = read_to_string(path)?;
         let data: RecipeData = toml::from_str(&data)?;
 
         Ok(Recipe {
             name: Box::from(file_name),
+            path: Box::from(path),
             data,
             download_lock: OnceCell::new(),
             directories: RecipeDirectories::default(),
@@ -60,15 +64,12 @@ impl Recipe {
         })
     }
 
-    pub(crate) fn provides(&self, package_name: &str, version: &VersionRequirement) -> bool {
-        self.data
-            .provides
-            .get(package_name)
-            .is_some_and(|provided_version| provided_version.satisfies(version))
-    }
-
     pub(crate) fn name(&self) -> &str {
         &self.name
+    }
+
+    pub(crate) fn version(&self) -> &Version {
+        &self.data.version
     }
 
     pub(crate) fn build_data(&self) -> &Build {
@@ -96,15 +97,16 @@ impl Recipe {
 
 impl Display for Recipe {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "the `{}` recipe", self.name)
+        write!(f, "the `{}` recipe at `{}`", self.name, self.path)
     }
 }
 
 #[serde_as]
 #[derive(Debug, Serialize, Deserialize)]
 struct RecipeData {
-    provides: HashMap<Box<str>, Version>,
+    version: Version,
 
+    // TODO: Make these non-optional.
     #[serde(default)]
     download: Download,
     #[serde(default)]
@@ -114,6 +116,7 @@ struct RecipeData {
     dependencies: Dependencies,
 }
 
+// TODO: Make this opaque and add a `PackageRequirement` type.
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub(crate) struct Dependencies {
     #[serde(flatten)]

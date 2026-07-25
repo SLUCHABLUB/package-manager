@@ -21,10 +21,10 @@ impl<'state> BuildPlan<'state> {
         }
     }
 
-    fn contains(&self, package_name: &str, version: &VersionRequirement) -> bool {
-        self.recipes
-            .iter()
-            .any(|recipe| recipe.provides(package_name, version))
+    fn contains(&self, package_name: &str, version_requirement: &VersionRequirement) -> bool {
+        self.recipes.iter().any(|recipe| {
+            recipe.name() == package_name && recipe.version().satisfies(version_requirement)
+        })
     }
 
     #[context("adding package `{name}` version {version} to the build plan")]

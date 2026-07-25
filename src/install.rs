@@ -191,6 +191,7 @@ fn check_conflict(
             let old_file = File::open(file.to_host_path())?;
             let old_hash = rapidhash_v3_file(old_file)?;
 
+            // TODO(bug): We are comparing the wrong hashes.
             if old_hash == new_hash {
                 ConflictCheckResult::Updated
             } else {

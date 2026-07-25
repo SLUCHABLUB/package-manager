@@ -1,5 +1,4 @@
-[provides]
-package-manager = "any"
+version = "dev"
 
 [download.github]
 repository = "sluchablub/package-manager"
