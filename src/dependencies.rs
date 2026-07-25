@@ -22,9 +22,8 @@ pub(crate) fn check_runtime_dependencies(
     recipe: &Recipe,
 ) -> anyhow::Result<()> {
     let elves: Vec<_> = ledger
-        .files
-        .iter()
-        .filter_map(|target_path| {
+        .files()
+        .filter_map(|(target_path, _hash)| {
             let host_path = target_path.with_root(target);
 
             parse_node(&host_path, target_path)

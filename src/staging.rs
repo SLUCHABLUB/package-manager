@@ -36,7 +36,7 @@ fn stage_single(
 
     let target = recipe.directories.target(recipe, state)?.path();
 
-    for entry in &recipe_ledger.files {
+    for (entry, _hash) in recipe_ledger.files() {
         let source = entry.with_root(target);
         let destination = entry.with_root(directory);
 

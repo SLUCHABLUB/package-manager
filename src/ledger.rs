@@ -9,9 +9,12 @@ use anyhow::Context;
 use const_str::join;
 use fn_error_context::context;
 use fs_err as fs;
+use fs_err::File;
 use fs_err::create_dir_all;
+use rapidhash::v3::rapidhash_v3_file;
 use serde::Deserialize;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::io;
 use std::path;
 use tracing::warn;
@@ -43,14 +46,16 @@ impl SystemLedger {
     }
 
     pub(crate) fn contains(&self, file: &TargetPath) -> bool {
-        self.files().any(|(_recipe, owned)| owned == file)
+        self.files().any(|(_recipe, path, _hash)| path == file)
     }
 
-    pub(crate) fn files(&self) -> impl Iterator<Item = (&str, &TargetPath)> {
-        self.data
-            .recipes
-            .iter()
-            .flat_map(|ledger| ledger.files.iter().map(|file| (&*ledger.name, &**file)))
+    pub(crate) fn files(&self) -> impl Iterator<Item = (&str, &TargetPath, u64)> {
+        self.data.recipes.iter().flat_map(|ledger| {
+            ledger
+                .hashes
+                .iter()
+                .map(|(file, hash)| (&*ledger.name, &**file, *hash))
+        })
     }
 
     pub(crate) fn write_to_root(&self, root: &HostPath) -> anyhow::Result<()> {
@@ -87,8 +92,9 @@ struct SystemLedgerData {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct RecipeLedger {
-    pub name: Box<str>,
-    pub files: Box<[Box<TargetPath>]>,
+    name: Box<str>,
+    // TODO: Make this a sequence on structs when serialising.
+    hashes: HashMap<Box<TargetPath>, u64>,
 }
 
 impl RecipeLedger {
@@ -107,7 +113,7 @@ impl RecipeLedger {
             return Ok(RecipeLedger::empty(recipe.name.clone()));
         };
 
-        let mut files = Vec::new();
+        let mut hashes = HashMap::new();
 
         for entry in WalkDir::new(target_directory) {
             let entry = entry.context("walking the directory")?;
@@ -119,19 +125,26 @@ impl RecipeLedger {
                 continue;
             }
 
-            files.push(TargetPath::from_path_and_root(path, target_directory));
+            let file = File::open(path)?;
+            let hash = rapidhash_v3_file(file)?;
+
+            hashes.insert(TargetPath::from_path_and_root(path, target_directory), hash);
         }
 
         Ok(RecipeLedger {
             name: recipe.name.clone(),
-            files: files.into_boxed_slice(),
+            hashes,
         })
     }
 
     fn empty(recipe: Box<str>) -> RecipeLedger {
         RecipeLedger {
             name: recipe,
-            files: Box::new([]),
+            hashes: HashMap::new(),
         }
+    }
+
+    pub(crate) fn files(&self) -> impl Iterator<Item = (&TargetPath, u64)> {
+        self.hashes.iter().map(|(file, hash)| (&**file, *hash))
     }
 }

@@ -12,6 +12,7 @@ use fs_err as fs;
 use fs_err::File;
 use fs_err::create_dir_all;
 use fs_err::remove_file;
+use rapidhash::v3::rapidhash_v3_file;
 use serde::Serialize;
 use std::fs::TryLockError;
 use std::io::Write;
@@ -37,8 +38,8 @@ pub(crate) fn install(
 
     let mut journal = Journal::new();
 
-    for (recipe, file) in ledger.files() {
-        match check_conflict(file, &old_ledger) {
+    for (recipe, file, hash) in ledger.files() {
+        match check_conflict(file, hash, &old_ledger)? {
             ConflictCheckResult::New => {
                 journal.operations.push(InstallOperation {
                     file: Box::from(file),
@@ -58,6 +59,10 @@ pub(crate) fn install(
                 bail!(
                     "the installation of the `{recipe}` recipe would override the unmanaged file at `{file}`"
                 );
+            }
+            ConflictCheckResult::Modified => {
+                // TODO: We could prompt the user here.
+                bail!("the file at `{file}` has been modified since the last installation");
             }
         }
     }
@@ -170,21 +175,33 @@ enum ConflictCheckResult {
     Updated,
     /// The file existed on the system but was not managed by the package manager.
     Unmanaged,
+    /// The file is managed but was modified since the last generation.
+    Modified,
 }
 
-fn check_conflict(file: &TargetPath, old_ledger: &SystemLedger) -> ConflictCheckResult {
+fn check_conflict(
+    file: &TargetPath,
+    new_hash: u64,
+    old_ledger: &SystemLedger,
+) -> anyhow::Result<ConflictCheckResult> {
     let host_path = file.to_host_path();
 
-    if host_path.exists() {
+    Ok(if host_path.exists() {
         if old_ledger.contains(file) {
-            // TODO: Check if the hash matches.
-            ConflictCheckResult::Updated
+            let old_file = File::open(file.to_host_path())?;
+            let old_hash = rapidhash_v3_file(old_file)?;
+
+            if old_hash == new_hash {
+                ConflictCheckResult::Updated
+            } else {
+                ConflictCheckResult::Modified
+            }
         } else {
             ConflictCheckResult::Unmanaged
         }
     } else {
         ConflictCheckResult::New
-    }
+    })
 }
 
 fn ledger_install(ledger: &SystemLedger) -> InstallOperation {
