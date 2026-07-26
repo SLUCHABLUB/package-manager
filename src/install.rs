@@ -187,6 +187,7 @@ fn lock(directories: &HostDirectories) -> anyhow::Result<File> {
         Err(TryLockError::Error(error)) => return Err(error.into()),
     }
 
+    // We need to reset the cursor since it might have been moved by a read.
     file.set_len(0)?;
     file.seek(SeekFrom::Start(0))?;
 
