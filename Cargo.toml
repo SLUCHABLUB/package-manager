@@ -37,3 +37,6 @@ walkdir = "2.5.0"
 pedantic = { level = "deny", priority = -1 }
 
 missing_errors_doc = "allow"
+
+[dev-dependencies]
+assert_cmd = "2.2.2"
