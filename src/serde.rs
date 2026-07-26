@@ -5,7 +5,7 @@ pub(crate) mod once_cell_as_option {
     use serde::Serialize;
     use serde::Serializer;
 
-    pub fn serialize<T, S>(cell: &OnceCell<T>, serialiser: S) -> Result<S::Ok, S::Error>
+    pub(crate) fn serialize<T, S>(cell: &OnceCell<T>, serialiser: S) -> Result<S::Ok, S::Error>
     where
         T: Serialize,
         S: Serializer,
@@ -13,7 +13,7 @@ pub(crate) mod once_cell_as_option {
         cell.get().serialize(serialiser)
     }
 
-    pub fn deserialize<'data, T, D>(deserialiser: D) -> Result<OnceCell<T>, D::Error>
+    pub(crate) fn deserialize<'data, T, D>(deserialiser: D) -> Result<OnceCell<T>, D::Error>
     where
         T: Deserialize<'data>,
         D: Deserializer<'data>,

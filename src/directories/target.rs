@@ -10,7 +10,7 @@ use crate::directories::XDG_RUNTIME_DIR;
 use crate::directories::XDG_STATE_HOME;
 use anyhow::Context as _;
 
-pub struct TargetDirectories {
+pub(crate) struct TargetDirectories {
     prefix: Box<TargetPath>,
 
     configuration: &'static TargetPath,
@@ -25,7 +25,7 @@ pub struct TargetDirectories {
 }
 
 impl TargetDirectories {
-    pub fn user() -> anyhow::Result<TargetDirectories> {
+    pub(crate) fn user() -> anyhow::Result<TargetDirectories> {
         Self::user_inner().context("detecting the target directories")
     }
 

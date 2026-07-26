@@ -13,7 +13,7 @@ use once_cell::unsync::OnceCell;
 use std::io;
 
 #[derive(Debug)]
-pub struct State {
+pub(crate) struct State {
     main_manifest: Manifest,
     directories: HostDirectories,
     recipes: OnceCell<Box<[Recipe]>>,
@@ -21,7 +21,7 @@ pub struct State {
 
 impl State {
     #[context("initialising the package manager state")]
-    pub fn initialise() -> anyhow::Result<State> {
+    pub(crate) fn initialise() -> anyhow::Result<State> {
         let directories = HostDirectories::new()?;
 
         let manifest =
@@ -35,7 +35,7 @@ impl State {
     }
 
     /// Downloads, builds, and installs all packages.
-    pub fn install(&self, into: &TargetDirectories) -> anyhow::Result<()> {
+    pub(crate) fn install(&self, into: &TargetDirectories) -> anyhow::Result<()> {
         let ledger = self.stage(into)?;
 
         install(&self.directories, &ledger, into)?;

@@ -11,8 +11,7 @@ use tracing::error;
 use tracing::warn;
 
 pub(crate) use host::HostDirectories;
-
-pub use target::TargetDirectories;
+pub(crate) use target::TargetDirectories;
 
 const PREFIX: &str = ".local";
 
