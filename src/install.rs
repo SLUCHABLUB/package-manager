@@ -13,9 +13,15 @@ use fs_err::File;
 use fs_err::create_dir_all;
 use fs_err::remove_file;
 use rapidhash::v3::rapidhash_v3_file;
+use serde::Deserialize;
 use serde::Serialize;
+use show_option::ShowOption;
 use std::fs::TryLockError;
+use std::io::Read;
+use std::io::Seek;
+use std::io::SeekFrom;
 use std::io::Write;
+use std::process;
 use tracing::info;
 use tracing::warn;
 
@@ -141,28 +147,57 @@ pub(crate) fn install(
     Ok(())
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct LockFile {
+    process_id: u32,
+}
+
 #[context("acquiring the file system lock")]
 fn lock(directories: &HostDirectories) -> anyhow::Result<File> {
-    let file = File::create(&*directories.lock_file)?;
+    let my_lock = LockFile {
+        process_id: process::id(),
+    };
+    let my_lock = toml::to_string(&my_lock)?;
+
+    let mut file = File::options()
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(&*directories.lock_file)?;
 
     match file.try_lock() {
         Ok(()) => (),
         Err(TryLockError::WouldBlock) => {
-            // TODO: Read what we're waiting for.
-            warn!("waiting for the file system lock");
+            // We have try-blocks at home.
+            let their_pid = (|| -> anyhow::Result<u32> {
+                let mut buffer = String::new();
+                file.read_to_string(&mut buffer)?;
+
+                let their_lock = toml::from_str::<LockFile>(&buffer)?;
+                Ok(their_lock.process_id)
+            })()
+            .ok();
+
+            warn!(
+                "waiting for the file system lock (held by {})",
+                their_pid.show_prefixed_or("the process with id ", "some unknown process")
+            );
             file.lock()?;
         }
         Err(TryLockError::Error(error)) => return Err(error.into()),
     }
 
-    // TODO: Write our PID & boot ID & operation to the file.
+    file.set_len(0)?;
+    file.seek(SeekFrom::Start(0))?;
+
+    file.write_all(my_lock.as_bytes())?;
 
     Ok(file)
 }
 
 #[context("releasing the file system lock")]
 fn unlock(file: File) -> anyhow::Result<()> {
-    // TODO: Clear the ID from the file.
+    file.set_len(0)?;
 
     file.unlock()?;
 
