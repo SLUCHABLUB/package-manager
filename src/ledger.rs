@@ -42,8 +42,8 @@ impl SystemLedger {
         &self.path
     }
 
-    pub(crate) fn add_recipe(&mut self, recipe: RecipeLedger) {
-        self.data.recipes.push(recipe);
+    pub(crate) fn add_recipe(&mut self, recipe: ImageLedger) {
+        self.data.packages.push(recipe);
     }
 
     pub(crate) fn hash(&self, file: &TargetPath) -> Option<u64> {
@@ -52,7 +52,7 @@ impl SystemLedger {
     }
 
     pub(crate) fn files(&self) -> impl Iterator<Item = (&str, &TargetPath, u64)> {
-        self.data.recipes.iter().flat_map(|ledger| {
+        self.data.packages.iter().flat_map(|ledger| {
             ledger
                 .hashes
                 .iter()
@@ -89,39 +89,40 @@ impl SystemLedger {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct SystemLedgerData {
-    recipes: Vec<RecipeLedger>,
+    packages: Vec<ImageLedger>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct RecipeLedger {
+pub(crate) struct ImageLedger {
+    /// The name of the corresponding package.
     name: Box<str>,
     // TODO: Make this a sequence on structs when serialising.
     hashes: HashMap<Box<TargetPath>, u64>,
 }
 
-impl RecipeLedger {
+impl ImageLedger {
     #[context(
         "creating a ledger of {}",
         recipe
             .directories()
-            .target(recipe, state)
+            .image(recipe, state)
             .map(CacheDirectory::path)
             .ok()
-            .show_surrounded_or("the target directory `", '`', recipe)
+            .show_surrounded_or("the image directory `", '`', recipe)
     )]
-    pub(crate) fn new(recipe: &Recipe, state: &State) -> anyhow::Result<RecipeLedger> {
-        let target_directory = recipe.directories().target(recipe, state)?;
-        let Some(target_directory) = target_directory.as_populated() else {
+    pub(crate) fn new(recipe: &Recipe, state: &State) -> anyhow::Result<ImageLedger> {
+        let image_directory = recipe.directories().image(recipe, state)?;
+        let Some(image_directory) = image_directory.as_populated() else {
             warn!(
                 "creating a ledger for the empty directory `{}`",
-                target_directory.path()
+                image_directory.path()
             );
-            return Ok(RecipeLedger::empty(Box::from(recipe.name())));
+            return Ok(ImageLedger::empty(Box::from(recipe.name())));
         };
 
         let mut hashes = HashMap::new();
 
-        for entry in WalkDir::new(target_directory) {
+        for entry in WalkDir::new(image_directory) {
             let entry = entry.context("walking the directory")?;
 
             let path =
@@ -134,17 +135,17 @@ impl RecipeLedger {
             let file = File::open(path)?;
             let hash = rapidhash_v3_file(file)?;
 
-            hashes.insert(TargetPath::from_path_and_root(path, target_directory), hash);
+            hashes.insert(TargetPath::from_path_and_root(path, image_directory), hash);
         }
 
-        Ok(RecipeLedger {
+        Ok(ImageLedger {
             name: Box::from(recipe.name()),
             hashes,
         })
     }
 
-    fn empty(recipe: Box<str>) -> RecipeLedger {
-        RecipeLedger {
+    fn empty(recipe: Box<str>) -> ImageLedger {
+        ImageLedger {
             name: recipe,
             hashes: HashMap::new(),
         }

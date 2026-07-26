@@ -25,7 +25,7 @@ use url::Url;
 pub(crate) struct RecipeDirectories {
     /// The path to the (to be) built package tree.
     #[serde(with = "once_cell_as_option")]
-    target: OnceCell<CacheDirectory>,
+    image: OnceCell<CacheDirectory>,
     /// The path to the working directory of the build.
     #[serde(with = "once_cell_as_option")]
     build_working: OnceCell<Box<HostPath>>,
@@ -41,9 +41,9 @@ pub(crate) struct RecipeDirectories {
 }
 
 impl RecipeDirectories {
-    pub(crate) fn target(&self, recipe: &Recipe, state: &State) -> anyhow::Result<&CacheDirectory> {
+    pub(crate) fn image(&self, recipe: &Recipe, state: &State) -> anyhow::Result<&CacheDirectory> {
         // TODO: Base this on the recipe hash.
-        self.target.get_or_try_init(|| {
+        self.image.get_or_try_init(|| {
             CacheDirectory::new(state.directories().targets.with_suffix(&*recipe.name))
         })
     }

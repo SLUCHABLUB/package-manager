@@ -3,7 +3,7 @@ use crate::State;
 use crate::SystemLedger;
 use crate::TargetDirectories;
 use crate::VersionRequirement;
-use crate::prepare_to_install;
+use crate::make_image;
 use crate::stage_recipes;
 use fn_error_context::context;
 
@@ -54,7 +54,7 @@ impl<'state> BuildPlan<'state> {
     ) -> anyhow::Result<SystemLedger> {
         // TODO: Parallelise.
         for recipe in &self.recipes {
-            prepare_to_install(recipe, target_directories, self.state)?;
+            make_image(recipe, target_directories, self.state)?;
         }
 
         let ledger = stage_recipes(&self.recipes, target_directories, self.state)?;

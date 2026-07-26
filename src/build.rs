@@ -22,7 +22,7 @@ const CONFIGURE_MAKE_DISTINATION_DIRECTORY: &str = concat!("DEST", "DIR");
 #[derive(Debug)]
 struct BuildInstruction<'data> {
     commands: Vec<Command>,
-    target_directory: &'data HostPath,
+    image_directory: &'data HostPath,
     working_directory: &'data HostPath,
 
     copies: Vec<FileTransfer<Box<HostPath>, Box<TargetPath>>>,
@@ -46,7 +46,7 @@ pub(crate) fn ensure_built(
 ) -> anyhow::Result<()> {
     recipe
         .directories()
-        .target(recipe, state)?
+        .image(recipe, state)?
         .as_populated_then_run_or_populate_with(
             |_| info!("using the cached target directory for {recipe}"),
             |into| {
@@ -61,7 +61,7 @@ pub(crate) fn ensure_built(
 #[context("building {recipe}")]
 fn build(
     recipe: &Recipe,
-    target_directory: &HostPath,
+    image_directory: &HostPath,
     target_directories: &TargetDirectories,
     state: &State,
 ) -> anyhow::Result<()> {
@@ -82,14 +82,14 @@ fn build(
         recipe.build_data(),
         build_root,
         working_directory,
-        target_directory,
+        image_directory,
         target_directories,
         &mut copies,
     );
 
     let instruction = BuildInstruction {
         commands,
-        target_directory,
+        image_directory,
         working_directory,
         copies,
     };
@@ -105,7 +105,7 @@ fn generate_commands(
     build: &Build,
     build_root: &HostPath,
     working_directory: &HostPath,
-    target_directory: &HostPath,
+    image_directory: &HostPath,
     target_directories: &TargetDirectories,
     copies: &mut Vec<FileTransfer<Box<HostPath>, Box<TargetPath>>>,
 ) -> Vec<Command> {
@@ -186,7 +186,7 @@ fn generate_commands(
             let mut install = Command::new("make");
             install
                 .arg("install")
-                .env(CONFIGURE_MAKE_DISTINATION_DIRECTORY, target_directory);
+                .env(CONFIGURE_MAKE_DISTINATION_DIRECTORY, image_directory);
 
             commands.push(configure);
             commands.push(compile);
@@ -247,7 +247,7 @@ fn build_in_sandbox(mut instruction: BuildInstruction, sandbox: Sandbox) -> anyh
     }
 
     for copy in instruction.copies {
-        let destination = copy.to.with_root(instruction.target_directory);
+        let destination = copy.to.with_root(instruction.image_directory);
         let destination: &Path = (*destination).as_ref();
 
         if let Some(parent) = destination.parent() {

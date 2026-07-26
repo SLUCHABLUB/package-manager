@@ -34,7 +34,7 @@ fn stage_single(
 ) -> anyhow::Result<()> {
     let recipe_ledger = recipe.ledger().get().context("retrieving the ledger")?;
 
-    let target = recipe.directories().target(recipe, state)?.path();
+    let target = recipe.directories().image(recipe, state)?.path();
 
     for (entry, _hash) in recipe_ledger.files() {
         let source = entry.with_root(target);

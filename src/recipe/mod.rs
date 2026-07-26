@@ -11,7 +11,7 @@ pub(crate) use download::Download;
 pub(crate) use download::DownloadLock;
 
 use crate::HostPath;
-use crate::RecipeLedger;
+use crate::ImageLedger;
 use crate::State;
 use crate::Version;
 use crate::VersionRequirement;
@@ -36,7 +36,7 @@ pub(crate) struct Recipe {
     directories: RecipeDirectories,
 
     // TODO: Move this out of here so it's ownership is tracked independently.
-    ledger: OnceCell<RecipeLedger>,
+    ledger: OnceCell<ImageLedger>,
 }
 
 impl Recipe {
@@ -90,7 +90,7 @@ impl Recipe {
         &self.directories
     }
 
-    pub(crate) fn ledger(&self) -> &OnceCell<RecipeLedger> {
+    pub(crate) fn ledger(&self) -> &OnceCell<ImageLedger> {
         &self.ledger
     }
 }
