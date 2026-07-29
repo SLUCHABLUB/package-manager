@@ -1,3 +1,4 @@
+use fs_err::canonicalize;
 use serde::Deserialize;
 use serde::Serialize;
 use std::ffi::OsStr;
@@ -88,6 +89,16 @@ impl HostPath {
         AbsolutePath::new_boxed(path).map(Self::from_absolute_boxed)
     }
 
+    pub(crate) fn from_cwd_relative(path: &Path) -> anyhow::Result<Box<HostPath>> {
+        let canon = canonicalize(path)?;
+
+        debug_assert!(canon.is_absolute());
+
+        Ok(HostPath::from_absolute_boxed(
+            AbsolutePath::new_boxed_unchecked(canon.into_boxed_path()),
+        ))
+    }
+
     pub(crate) fn parent(&self) -> Option<&HostPath> {
         // The parent of an absolute path should be absolute.
         (**self)
@@ -114,6 +125,14 @@ impl HostPath {
     {
         let HostPath(prefix) = self;
         HostPath::from_absolute_boxed(prefix.with_suffix(suffix.as_ref()))
+    }
+}
+
+impl Clone for Box<HostPath> {
+    fn clone(&self) -> Self {
+        let HostPath(AbsolutePath(path)) = &**self;
+        let path = Box::<Path>::from(path);
+        HostPath::from_absolute_boxed(AbsolutePath::new_boxed_unchecked(path))
     }
 }
 
@@ -252,7 +271,7 @@ impl Clone for Box<TargetPath> {
     fn clone(&self) -> Self {
         let TargetPath(AbsolutePath(path)) = &**self;
         let path = Box::<Path>::from(path);
-        TargetPath::new_boxed(path).expect("the path should be absolute")
+        TargetPath::from_absolute_boxed(AbsolutePath::new_boxed_unchecked(path))
     }
 }
 

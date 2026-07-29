@@ -9,6 +9,7 @@ clean-all:
 offline-clean-all:
     @just offline-clean bat-gnu
 
+[working-directory: directory]
 with-home directory +command:
     HOME='{{ ui_tests_directory }}/{{ directory }}' \
     XDG_BIN_HOME='{{ ui_tests_directory }}/{{ directory }}/executables' \
@@ -24,19 +25,14 @@ test directory:
     cargo build
 
     @just with-home '{{ directory }}' \
-    '{{ ui_tests_directory }}/../target/debug/package-manager' install
+    '{{ ui_tests_directory }}/../target/debug/package-manager' update --manifest 'manifest.toml'
 
     # TODO: Glibc is wack.
     # ! test -d '{{ ui_tests_directory }}/{{ directory }}/.local'
 
-clean-config directory:
-    # Keep the non-installed configurations.
-    find "{{ ui_tests_directory }}/{{ directory }}/configuration" -mindepth 1 -maxdepth 1 \
-        ! -name package-manager \
-        -exec rm -rf {} +
-
 offline-clean directory:
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/executables"
+    rm -rf "{{ ui_tests_directory }}/{{ directory }}/configuration"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/data"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/headers"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/libraries"
@@ -49,16 +45,13 @@ offline-clean directory:
         ! -name sources \
         -exec rm -rf {} +
 
-    @just clean-config '{{directory}}'
-
 clean directory:
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/executables"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/cache"
+    rm -rf "{{ ui_tests_directory }}/{{ directory }}/configuration"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/data"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/headers"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/libraries"
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/state"
     # Glibc is wack.
     rm -rf "{{ ui_tests_directory }}/{{ directory }}/.local"
-
-    @just clean-config '{{directory}}'

@@ -30,8 +30,8 @@ const BACKUP_EXTENSION: &str = concat!(PACKAGE_NAME, '-', "backup");
 
 // TODO: Take an installation method parameter.
 pub(crate) fn install(
+    ledger: SystemLedger,
     host: &HostDirectories,
-    ledger: &SystemLedger,
     target: &TargetDirectories,
 ) -> anyhow::Result<()> {
     let lock = lock(host)?;
@@ -76,7 +76,9 @@ pub(crate) fn install(
         }
     }
 
-    journal.operations.push(ledger_install(ledger));
+    journal.operations.push(ledger_install(&ledger));
+
+    drop(ledger);
 
     let journal = journal;
 

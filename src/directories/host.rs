@@ -1,7 +1,6 @@
 use crate::HostPath;
 use crate::PACKAGE_NAME;
 use crate::directories::XDG_CACHE_HOME;
-use crate::directories::XDG_CONFIG_HOME;
 use crate::directories::XDG_DATA_HOME;
 use anyhow::Context;
 use const_str::join;
@@ -10,13 +9,12 @@ use std::path;
 // TODO: Make this opaque.
 #[derive(Debug)]
 pub(crate) struct HostDirectories {
-    pub(crate) user_configuration: Box<HostPath>,
-
     pub(crate) repositories: Box<HostPath>,
     pub(crate) sources: Box<HostPath>,
     pub(crate) working: Box<HostPath>,
-    pub(crate) targets: Box<HostPath>,
+    pub(crate) images: Box<HostPath>,
 
+    // TODO: Use RAII for this.
     pub(crate) staging: Box<HostPath>,
 
     // TODO: We should have locks on other things such as downloading, building and staging.
@@ -33,8 +31,6 @@ impl HostDirectories {
 
     fn new_inner() -> Option<HostDirectories> {
         Some(HostDirectories {
-            user_configuration: XDG_CONFIG_HOME.as_ref()?.with_suffix(PACKAGE_NAME),
-
             repositories: XDG_CACHE_HOME.as_ref()?.with_suffix(join!(
                 &[PACKAGE_NAME, "repositories"],
                 path::MAIN_SEPARATOR_STR
@@ -45,9 +41,9 @@ impl HostDirectories {
             working: XDG_CACHE_HOME
                 .as_ref()?
                 .with_suffix(join!(&[PACKAGE_NAME, "build"], path::MAIN_SEPARATOR_STR)),
-            targets: XDG_CACHE_HOME
+            images: XDG_CACHE_HOME
                 .as_ref()?
-                .with_suffix(join!(&[PACKAGE_NAME, "targets"], path::MAIN_SEPARATOR_STR)),
+                .with_suffix(join!(&[PACKAGE_NAME, "images"], path::MAIN_SEPARATOR_STR)),
 
             staging: XDG_DATA_HOME
                 .as_ref()?

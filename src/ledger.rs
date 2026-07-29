@@ -1,10 +1,11 @@
-use crate::CacheDirectory;
 use crate::HostPath;
+use crate::Image;
 use crate::PACKAGE_NAME;
 use crate::Recipe;
-use crate::State;
 use crate::TargetDirectories;
 use crate::TargetPath;
+use crate::Version;
+use crate::VersionRequirement;
 use anyhow::Context;
 use const_str::join;
 use fn_error_context::context;
@@ -14,11 +15,9 @@ use fs_err::create_dir_all;
 use rapidhash::v3::rapidhash_v3_file;
 use serde::Deserialize;
 use serde::Serialize;
-use show_option::ShowOption as _;
 use std::collections::HashMap;
 use std::io;
 use std::path;
-use tracing::warn;
 use walkdir::WalkDir;
 
 #[derive(Debug)]
@@ -40,6 +39,16 @@ impl SystemLedger {
 
     pub(crate) fn path(&self) -> &TargetPath {
         &self.path
+    }
+
+    pub(crate) fn contains(
+        &self,
+        package_name: &str,
+        version_requirement: &VersionRequirement,
+    ) -> bool {
+        self.data.packages.iter().any(|package| {
+            &*package.name == package_name && package.version.satisfies(version_requirement)
+        })
     }
 
     pub(crate) fn add_recipe(&mut self, recipe: ImageLedger) {
@@ -96,33 +105,20 @@ struct SystemLedgerData {
 pub(crate) struct ImageLedger {
     /// The name of the corresponding package.
     name: Box<str>,
+    /// The version of the corresponding package.
+    version: Version,
     // TODO: Make this a sequence on structs when serialising.
     hashes: HashMap<Box<TargetPath>, u64>,
 }
 
 impl ImageLedger {
-    #[context(
-        "creating a ledger of {}",
-        recipe
-            .directories()
-            .image(recipe, state)
-            .map(CacheDirectory::path)
-            .ok()
-            .show_surrounded_or("the image directory `", '`', recipe)
-    )]
-    pub(crate) fn new(recipe: &Recipe, state: &State) -> anyhow::Result<ImageLedger> {
-        let image_directory = recipe.directories().image(recipe, state)?;
-        let Some(image_directory) = image_directory.as_populated() else {
-            warn!(
-                "creating a ledger for the empty directory `{}`",
-                image_directory.path()
-            );
-            return Ok(ImageLedger::empty(Box::from(recipe.name())));
-        };
+    #[context("creating a ledger of {recipe}")]
+    pub(crate) fn new(recipe: &Recipe, image: &Image) -> anyhow::Result<ImageLedger> {
+        let Image(image) = image;
 
-        let mut hashes = HashMap::new();
+        let mut ledger = ImageLedger::empty(recipe);
 
-        for entry in WalkDir::new(image_directory) {
+        for entry in WalkDir::new(image) {
             let entry = entry.context("walking the directory")?;
 
             let path =
@@ -135,18 +131,18 @@ impl ImageLedger {
             let file = File::open(path)?;
             let hash = rapidhash_v3_file(file)?;
 
-            hashes.insert(TargetPath::from_path_and_root(path, image_directory), hash);
+            ledger
+                .hashes
+                .insert(TargetPath::from_path_and_root(path, image), hash);
         }
 
-        Ok(ImageLedger {
-            name: Box::from(recipe.name()),
-            hashes,
-        })
+        Ok(ledger)
     }
 
-    fn empty(recipe: Box<str>) -> ImageLedger {
+    fn empty(recipe: &Recipe) -> ImageLedger {
         ImageLedger {
-            name: recipe,
+            name: Box::from(recipe.name()),
+            version: recipe.version().clone(),
             hashes: HashMap::new(),
         }
     }

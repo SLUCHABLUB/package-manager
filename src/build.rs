@@ -1,16 +1,20 @@
+use crate::BuildRoot;
 use crate::BuildSystem;
+use crate::BuildWorkingDirectory;
+use crate::HostDirectories;
 use crate::HostPath;
+use crate::Image;
 use crate::Recipe;
-use crate::State;
+use crate::Source;
 use crate::TargetDirectories;
 use crate::TargetPath;
-use crate::ensure_downloaded;
 use crate::recipe::Build;
 use anyhow::Context;
 use anyhow::bail;
 use bstr::ByteSlice;
 use fn_error_context::context;
 use fs_err as fs;
+use fs_err::create_dir_all;
 use std::ffi::OsString;
 use std::path::Path;
 use std::process::Command;
@@ -20,18 +24,9 @@ use tracing::warn;
 const CONFIGURE_MAKE_DISTINATION_DIRECTORY: &str = concat!("DEST", "DIR");
 
 #[derive(Debug)]
-struct BuildInstruction<'data> {
-    commands: Vec<Command>,
-    image_directory: &'data HostPath,
-    working_directory: &'data HostPath,
-
-    copies: Vec<FileTransfer<Box<HostPath>, Box<TargetPath>>>,
-}
-
-#[derive(Debug)]
-struct FileTransfer<FromPath, ToPath> {
-    from: FromPath,
-    to: ToPath,
+struct FileTransfer {
+    from: Box<HostPath>,
+    to: Box<TargetPath>,
 }
 
 #[derive(Copy, Clone)]
@@ -39,36 +34,24 @@ enum Sandbox {
     None,
 }
 
-pub(crate) fn ensure_built(
-    recipe: &Recipe,
-    target_directories: &TargetDirectories,
-    state: &State,
-) -> anyhow::Result<()> {
-    recipe
-        .directories()
-        .image(recipe, state)?
-        .as_populated_then_run_or_populate_with(
-            |_| info!("using the cached target directory for {recipe}"),
-            |into| {
-                info!("building {recipe}");
-                build(recipe, into, target_directories, state)?;
-                info!("built {recipe}");
-                anyhow::Ok(())
-            },
-        )
-}
-
 #[context("building {recipe}")]
-fn build(
+pub(crate) fn build(
     recipe: &Recipe,
-    image_directory: &HostPath,
+    source: Source,
     target_directories: &TargetDirectories,
-    state: &State,
-) -> anyhow::Result<()> {
-    ensure_downloaded(recipe, state)?;
+    host: &HostDirectories,
+) -> anyhow::Result<Image> {
+    let image = match Image::find_cached(recipe, host)? {
+        Ok(cached) => return Ok(cached),
+        Err(unitialised) => unitialised,
+    };
 
-    let build_root = recipe.directories().build_root(recipe, state)?;
-    let working_directory = recipe.directories().build_working(recipe, state)?;
+    info!("building {}", recipe.name());
+
+    create_dir_all(&image)?;
+
+    let build_root = BuildRoot::new(source, recipe)?;
+    let working_directory = BuildWorkingDirectory::new(recipe, host)?;
 
     for (dependency, version) in &recipe.build_data().dependencies.versions {
         // TODO
@@ -80,35 +63,32 @@ fn build(
 
     let commands = generate_commands(
         recipe.build_data(),
+        &image,
         build_root,
-        working_directory,
-        image_directory,
+        &working_directory,
         target_directories,
         &mut copies,
     );
 
-    let instruction = BuildInstruction {
-        commands,
-        image_directory,
-        working_directory,
-        copies,
-    };
+    // TODO: Take the sandbox as a parameter.
+    let image = build_in_sandbox(image, commands, working_directory, copies, Sandbox::None)?;
 
-    // TODO: Base the sandbox on the manifest.
-    build_in_sandbox(instruction, Sandbox::None)?;
+    info!("built {}", recipe.name());
 
-    Ok(())
+    Ok(image)
 }
 
-// TODO: Fix this parameter hazard.
 fn generate_commands(
     build: &Build,
-    build_root: &HostPath,
-    working_directory: &HostPath,
-    image_directory: &HostPath,
+    image: &HostPath,
+    build_root: BuildRoot,
+    working_directory: &BuildWorkingDirectory,
     target_directories: &TargetDirectories,
-    copies: &mut Vec<FileTransfer<Box<HostPath>, Box<TargetPath>>>,
+    copies: &mut Vec<FileTransfer>,
 ) -> Vec<Command> {
+    let BuildRoot(build_root) = build_root;
+    let BuildWorkingDirectory(working_directory) = working_directory;
+
     let mut commands = Vec::new();
 
     match &build.system {
@@ -186,7 +166,7 @@ fn generate_commands(
             let mut install = Command::new("make");
             install
                 .arg("install")
-                .env(CONFIGURE_MAKE_DISTINATION_DIRECTORY, image_directory);
+                .env(CONFIGURE_MAKE_DISTINATION_DIRECTORY, image);
 
             commands.push(configure);
             commands.push(compile);
@@ -216,15 +196,23 @@ fn flag(name: &str, path: &TargetPath) -> OsString {
     buffer
 }
 
-fn build_in_sandbox(mut instruction: BuildInstruction, sandbox: Sandbox) -> anyhow::Result<()> {
+fn build_in_sandbox(
+    image: Box<HostPath>,
+    mut commands: Vec<Command>,
+    working_directory: BuildWorkingDirectory,
+    copies: Vec<FileTransfer>,
+    sandbox: Sandbox,
+) -> anyhow::Result<Image> {
+    let BuildWorkingDirectory(working_directory) = working_directory;
+
     match sandbox {
         Sandbox::None => (),
     }
 
     warn!("not sand-boxing the build");
 
-    for command in &mut instruction.commands {
-        command.current_dir(instruction.working_directory);
+    for command in &mut commands {
+        command.current_dir(&working_directory);
 
         let output = command.output().with_context(|| {
             format!(
@@ -246,8 +234,8 @@ fn build_in_sandbox(mut instruction: BuildInstruction, sandbox: Sandbox) -> anyh
         }
     }
 
-    for copy in instruction.copies {
-        let destination = copy.to.with_root(instruction.image_directory);
+    for copy in copies {
+        let destination = copy.to.with_root(&image);
         let destination: &Path = (*destination).as_ref();
 
         if let Some(parent) = destination.parent() {
@@ -256,5 +244,5 @@ fn build_in_sandbox(mut instruction: BuildInstruction, sandbox: Sandbox) -> anyh
         fs::copy(copy.from, destination)?;
     }
 
-    Ok(())
+    Ok(Image(image))
 }

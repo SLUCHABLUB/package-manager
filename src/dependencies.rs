@@ -1,4 +1,5 @@
 use crate::HostPath;
+use crate::Image;
 use crate::ImageLedger;
 use crate::Recipe;
 use crate::ResultExtension as _;
@@ -18,9 +19,11 @@ use std::io::Read;
 #[context("checking the runtime dependencies for {recipe}")]
 pub(crate) fn check_runtime_dependencies(
     ledger: &ImageLedger,
-    image: &HostPath,
+    image: &Image,
     recipe: &Recipe,
 ) -> anyhow::Result<()> {
+    let Image(image) = image;
+
     let elves: Vec<_> = ledger
         .files()
         .filter_map(|(target_path, _hash)| {

@@ -1,7 +1,11 @@
+use crate::HostDirectories;
 use crate::HostPath;
 use crate::Recipe;
 use crate::ResultExtension as _;
+use crate::SystemLedger;
 use crate::VersionRequirement;
+use crate::plan::DownloadPlan;
+use crate::recipe_store::RecipeStore;
 use anyhow::Context;
 use fs_err::read_dir;
 use fs_err::read_to_string;
@@ -45,7 +49,7 @@ impl Manifest {
         })
     }
 
-    pub(crate) fn read_recipes(&self) -> impl Iterator<Item = Recipe> {
+    fn read_recipes(&self) -> impl Iterator<Item = Recipe> {
         self.data
             .recipe_directories
             .iter()
@@ -72,11 +76,32 @@ impl Manifest {
             .flatten()
     }
 
+    pub(crate) fn create_recipe_store(&self) -> RecipeStore {
+        RecipeStore::from_recipes(self.read_recipes())
+    }
+
     pub(crate) fn packages(&self) -> impl Iterator<Item = (&str, &VersionRequirement)> {
         self.data
             .packages
             .iter()
             .map(|(package, version)| (&**package, version))
+    }
+
+    pub(crate) fn update(
+        &self,
+        installed: &SystemLedger,
+        recipes: &'static RecipeStore,
+        host: &HostDirectories,
+    ) -> anyhow::Result<DownloadPlan> {
+        let mut plan = DownloadPlan::new();
+
+        for (name, version) in self.packages() {
+            if !installed.contains(name, version) {
+                plan.add_package(name, version, recipes, host)?;
+            }
+        }
+
+        Ok(plan)
     }
 }
 

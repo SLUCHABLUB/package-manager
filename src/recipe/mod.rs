@@ -4,21 +4,21 @@ mod download;
 
 pub(crate) use build::Build;
 pub(crate) use build::BuildSystem;
-pub(crate) use directories::CacheDirectory;
-pub(crate) use directories::RecipeDirectories;
+pub(crate) use directories::BuildRoot;
+pub(crate) use directories::BuildWorkingDirectory;
+pub(crate) use directories::Image;
+pub(crate) use directories::Source;
 pub(crate) use download::Compression;
 pub(crate) use download::Download;
 pub(crate) use download::DownloadLock;
 
 use crate::HostPath;
-use crate::ImageLedger;
-use crate::State;
 use crate::Version;
 use crate::VersionRequirement;
 use anyhow::Context;
+use directories::find_cached_repository_or_initialise;
 use fn_error_context::context;
 use fs_err::read_to_string;
-use once_cell::unsync::OnceCell;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_with::serde_as;
@@ -31,12 +31,6 @@ pub(crate) struct Recipe {
     path: Box<HostPath>,
 
     data: RecipeData,
-
-    download_lock: OnceCell<DownloadLock>,
-    directories: RecipeDirectories,
-
-    // TODO: Move this out of here so it's ownership is tracked independently.
-    ledger: OnceCell<ImageLedger>,
 }
 
 impl Recipe {
@@ -58,9 +52,6 @@ impl Recipe {
             name: Box::from(file_name),
             path: Box::from(path),
             data,
-            download_lock: OnceCell::new(),
-            directories: RecipeDirectories::default(),
-            ledger: OnceCell::new(),
         })
     }
 
@@ -72,26 +63,16 @@ impl Recipe {
         &self.data.version
     }
 
+    pub(crate) fn download_data(&self) -> &Download {
+        &self.data.download
+    }
+
     pub(crate) fn build_data(&self) -> &Build {
         &self.data.build
     }
 
     pub(crate) fn dependencies(&self) -> &Dependencies {
         &self.data.dependencies
-    }
-
-    #[context("locking the download for the `{}` recipe", self.name)]
-    pub(crate) fn download_lock(&self, state: &State) -> anyhow::Result<&DownloadLock> {
-        self.download_lock
-            .get_or_try_init(|| self.data.download.lock(&self.directories, state))
-    }
-
-    pub(crate) fn directories(&self) -> &RecipeDirectories {
-        &self.directories
-    }
-
-    pub(crate) fn ledger(&self) -> &OnceCell<ImageLedger> {
-        &self.ledger
     }
 }
 

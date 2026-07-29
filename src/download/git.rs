@@ -1,7 +1,6 @@
 use crate::HostPath;
-use crate::RecipeDirectories;
 use crate::Resolver;
-use crate::State;
+use crate::Source;
 use crate::Version;
 use crate::VersionRequirement;
 use anyhow::Context as _;
@@ -19,22 +18,18 @@ use gix::remote::ref_map;
 use gix::worktree::state::checkout;
 use non_zero::non_zero;
 use std::sync::atomic::AtomicBool;
-use tracing::info;
 use tracing::warn;
 use url::Url;
 
 #[context("downloading the git repository at `{url}`")]
 pub(in crate::download) fn download_git(
+    repository: &Repository,
     url: &Url,
     commit: ObjectId,
-    source_directory: &HostPath,
-    directories: &RecipeDirectories,
-    state: &State,
-) -> anyhow::Result<()> {
+    source_directory: Box<HostPath>,
+) -> anyhow::Result<Source> {
     let interrupt = AtomicBool::new(false);
     let mut progress = Discard;
-
-    let repository = repository(directories, url, state)?;
 
     let remote = repository
         .remote_at(url.as_str())
@@ -43,7 +38,7 @@ pub(in crate::download) fn download_git(
     // A ref-spec of only `<commit>` will fetch only said tag into `FETCH_HEAD`.
     let remote = remote
         .with_refspecs([commit.to_string().as_bytes()], Direction::Fetch)
-        .context("setting ref-specs")?;
+        .context("setting the ref-specs")?;
 
     let connection = remote
         .connect(Direction::Fetch)
@@ -71,7 +66,7 @@ pub(in crate::download) fn download_git(
 
     let _outcome = checkout(
         &mut index,
-        source_directory,
+        &*source_directory,
         repository.objects.clone(),
         &file_counter,
         &byte_counter,
@@ -80,22 +75,19 @@ pub(in crate::download) fn download_git(
     )
     .context("checking out the tree")?;
 
-    Ok(())
+    Ok(Source(source_directory))
 }
 
-#[context("resolving the version {version} to a commit in the repository at `{repository_url}`")]
+#[context("resolving the version {version} to a commit in the repository at `{url}`")]
 pub(crate) fn resolve_commit(
-    repository_url: &Url,
+    repository: &Repository,
+    url: &Url,
     version: &VersionRequirement,
-    directories: &RecipeDirectories,
-    state: &State,
 ) -> anyhow::Result<ObjectId> {
     let mut progress = Discard;
 
-    let repository = repository(directories, repository_url, state)?;
-
     let remote = repository
-        .remote_at(repository_url.as_str())
+        .remote_at(url.as_str())
         .context("adding the remote")?;
 
     let connection = remote
@@ -129,22 +121,6 @@ pub(crate) fn resolve_commit(
     };
 
     Ok(commit)
-}
-
-fn repository(
-    directories: &RecipeDirectories,
-    url: &Url,
-    state: &State,
-) -> anyhow::Result<Repository> {
-    directories
-        .repository_from_git_url(url, state)?
-        .as_populated_then_try_or_populate_with(
-            |path| {
-                info!("using the cached repository");
-                gix::open(path).context("opening the cached repository")
-            },
-            |path| gix::init_bare(path).context("initialising the git repository"),
-        )
 }
 
 fn to_tag(reference: &Ref) -> Option<(&BStr, ObjectId)> {

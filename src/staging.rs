@@ -1,44 +1,57 @@
-use crate::HostPath;
+use crate::HostDirectories;
+use crate::Image;
+use crate::ImageLedger;
 use crate::Recipe;
-use crate::State;
 use crate::SystemLedger;
 use crate::TargetDirectories;
 use anyhow::Context;
 use fn_error_context::context;
 use fs_err as fs;
+use fs_err::remove_dir_all;
+use std::io;
+use tracing::info;
 
-pub(crate) fn stage_recipes(
-    recipes: &[&Recipe],
+pub(crate) fn stage(
+    packages: impl IntoIterator<Item = (&'static Recipe, Image, ImageLedger)>,
+    host: &HostDirectories,
     target_directories: &TargetDirectories,
-    state: &State,
 ) -> anyhow::Result<SystemLedger> {
-    let staging = &state.directories().staging;
+    info!("staging the packages");
 
-    let mut ledger = SystemLedger::new(target_directories);
+    let staging = &host.staging;
 
-    for recipe in recipes {
-        stage_single(recipe, staging, &mut ledger, state)?;
+    match remove_dir_all(staging) {
+        Ok(()) => (),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => (),
+        result @ Err(_) => result?,
     }
 
-    ledger.write_to_root(staging)?;
+    let mut system_ledger = SystemLedger::new(target_directories);
 
-    Ok(ledger)
+    for (recipe, image, image_ledger) in packages {
+        stage_single(recipe, image, image_ledger, host, &mut system_ledger)?;
+    }
+
+    system_ledger.write_to_root(staging)?;
+
+    info!("staging complete");
+
+    Ok(system_ledger)
 }
 
-#[context("staging {recipe} into `{}`", directory)]
+#[context("staging {recipe}")]
 fn stage_single(
     recipe: &Recipe,
-    directory: &HostPath,
+    image: Image,
+    image_ledger: ImageLedger,
+    host: &HostDirectories,
     system_ledger: &mut SystemLedger,
-    state: &State,
 ) -> anyhow::Result<()> {
-    let recipe_ledger = recipe.ledger().get().context("retrieving the ledger")?;
+    let Image(image) = image;
 
-    let target = recipe.directories().image(recipe, state)?.path();
-
-    for (entry, _hash) in recipe_ledger.files() {
-        let source = entry.with_root(target);
-        let destination = entry.with_root(directory);
+    for (entry, _hash) in image_ledger.files() {
+        let source = entry.with_root(&image);
+        let destination = entry.with_root(&host.staging);
 
         let destination_parent = destination
             .parent()
@@ -49,7 +62,7 @@ fn stage_single(
         fs::copy(source, destination)?;
     }
 
-    system_ledger.add_recipe(recipe_ledger.clone());
+    system_ledger.add_recipe(image_ledger);
 
     Ok(())
 }

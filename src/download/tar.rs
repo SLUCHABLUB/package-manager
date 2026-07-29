@@ -1,5 +1,6 @@
 use crate::Compression;
 use crate::HostPath;
+use crate::Source;
 use anyhow::Context as _;
 use fn_error_context::context;
 use lzma_rs::xz_decompress;
@@ -12,8 +13,8 @@ use url::Url;
 pub(in crate::download) fn download_tarball(
     url: &Url,
     compression: Compression,
-    source_directory: &HostPath,
-) -> anyhow::Result<()> {
+    source_directory: Box<HostPath>,
+) -> anyhow::Result<Source> {
     let client = ClientBuilder::new()
         .timeout(None)
         .build()
@@ -37,9 +38,9 @@ pub(in crate::download) fn download_tarball(
 
     let mut archive = Archive::new(Cursor::new(decompressed_bytes));
 
-    archive.unpack(source_directory)?;
+    archive.unpack(&source_directory)?;
 
-    Ok(())
+    Ok(Source(source_directory))
 }
 
 pub(crate) fn split_tarball_file_name(file_name: &str) -> Option<(&str, Compression)> {

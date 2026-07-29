@@ -1,12 +1,13 @@
+use crate::HostDirectories;
 use crate::IndexedFile;
-use crate::RecipeDirectories;
-use crate::State;
 use crate::VersionRequirement;
 use crate::detect_tarball_compression;
 use crate::find_in_index;
+use crate::recipe::find_cached_repository_or_initialise;
 use crate::resolve_commit;
 use anyhow::bail;
 use gix::ObjectId;
+use gix::Repository;
 use serde::Deserialize;
 use serde::Serialize;
 use url::Url;
@@ -31,11 +32,7 @@ pub(crate) enum Download {
 }
 
 impl Download {
-    pub(in crate::recipe) fn lock(
-        &self,
-        directories: &RecipeDirectories,
-        state: &State,
-    ) -> anyhow::Result<DownloadLock> {
+    pub(crate) fn lock(&self, host: &HostDirectories) -> anyhow::Result<DownloadLock> {
         Ok(match self {
             Download::None => DownloadLock::None,
             Download::Github {
@@ -45,9 +42,15 @@ impl Download {
                 let url = format!("https://github.com/{repository}.git");
                 let url = Url::parse(&url)?;
 
-                let commit = resolve_commit(&url, version, directories, state)?;
+                let repository = find_cached_repository_or_initialise(&url, host)?;
 
-                DownloadLock::Git { url, commit }
+                let commit = resolve_commit(&repository, &url, version)?;
+
+                DownloadLock::Git {
+                    repository: Box::new(repository),
+                    url,
+                    commit,
+                }
             }
             Download::Tarball { url, compression } => {
                 let Some(compression) =
@@ -100,12 +103,14 @@ impl Compression {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub(crate) enum DownloadLock {
     None,
     Git {
         url: Url,
         commit: ObjectId,
+        // Boxed so clippy doesn't complain about it's size.
+        repository: Box<Repository>,
     },
     Tarball {
         real_url: Url,
