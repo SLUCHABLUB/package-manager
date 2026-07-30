@@ -1,5 +1,3 @@
-// TODO: Rename this file to cache.rs
-
 use crate::DownloadLock;
 use crate::HostDirectories;
 use crate::HostPath;
