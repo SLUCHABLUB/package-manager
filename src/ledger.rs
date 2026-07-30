@@ -51,7 +51,7 @@ impl SystemLedger {
         })
     }
 
-    pub(crate) fn add_recipe(&mut self, recipe: ImageLedger) {
+    pub(crate) fn add_image(&mut self, recipe: ImageLedger) {
         self.data.packages.push(recipe);
     }
 

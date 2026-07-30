@@ -62,7 +62,7 @@ fn stage_single(
         fs::copy(source, destination)?;
     }
 
-    system_ledger.add_recipe(image_ledger);
+    system_ledger.add_image(image_ledger);
 
     Ok(())
 }
