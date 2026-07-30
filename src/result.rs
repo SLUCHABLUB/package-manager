@@ -2,8 +2,6 @@ use once_cell::race::OnceBool;
 use std::any::TypeId;
 use std::env;
 use std::ffi::OsStr;
-use std::fmt::Debug;
-use std::fmt::Display;
 use tracing::error;
 
 pub(crate) trait ResultExtension {
@@ -14,11 +12,11 @@ pub(crate) trait ResultExtension {
 
 impl<T, E> ResultExtension for Result<T, E>
 where
-    E: Debug + Display + 'static,
+    E: Into<anyhow::Error> + 'static,
 {
     type T = T;
 
-    fn ok_or_log(self) -> Option<Self::T> {
+    fn ok_or_log(self) -> Option<T> {
         static BACKTRACE: OnceBool = OnceBool::new();
 
         let backtrace = BACKTRACE.get_or_init(|| match env::var_os("RUST_LIB_BACKTRACE") {
@@ -36,11 +34,11 @@ where
         match self {
             Ok(value) => Some(value),
             Err(error) if is_anyhow && backtrace => {
-                error!("{error:?}");
+                error!("{:?}", error.into());
                 None
             }
             Err(error) => {
-                error!("{error:#}");
+                error!("{:#}", error.into());
                 None
             }
         }

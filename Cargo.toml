@@ -40,3 +40,4 @@ missing_errors_doc = "allow"
 
 [dev-dependencies]
 assert_cmd = "2.2.2"
+tap = "1.0.1"
