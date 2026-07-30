@@ -11,8 +11,8 @@ use crate::VersionRequirement;
 use crate::build;
 use crate::check_image;
 use crate::download;
+use crate::find_cached_download_lock_or_create;
 use crate::stage;
-use anyhow::Context;
 use fn_error_context::context;
 use tracing::info;
 
@@ -88,10 +88,7 @@ impl DownloadPlan {
 
         let locked = LockedRecipe {
             recipe,
-            lock: recipe
-                .download_data()
-                .lock(host)
-                .with_context(|| format!("locking {recipe}"))?,
+            lock: find_cached_download_lock_or_create(recipe, host)?,
         };
 
         self.recipes.push(locked);

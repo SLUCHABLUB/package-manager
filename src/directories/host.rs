@@ -9,6 +9,7 @@ use std::path;
 // TODO: Make this opaque.
 #[derive(Debug)]
 pub(crate) struct HostDirectories {
+    pub(crate) download_locks: Box<HostPath>,
     pub(crate) repositories: Box<HostPath>,
     pub(crate) sources: Box<HostPath>,
     pub(crate) working: Box<HostPath>,
@@ -31,6 +32,10 @@ impl HostDirectories {
 
     fn new_inner() -> Option<HostDirectories> {
         Some(HostDirectories {
+            download_locks: XDG_CACHE_HOME.as_ref()?.with_suffix(join!(
+                &[PACKAGE_NAME, "download-locks"],
+                path::MAIN_SEPARATOR_STR
+            )),
             repositories: XDG_CACHE_HOME.as_ref()?.with_suffix(join!(
                 &[PACKAGE_NAME, "repositories"],
                 path::MAIN_SEPARATOR_STR
@@ -41,6 +46,7 @@ impl HostDirectories {
             working: XDG_CACHE_HOME
                 .as_ref()?
                 .with_suffix(join!(&[PACKAGE_NAME, "build"], path::MAIN_SEPARATOR_STR)),
+
             images: XDG_CACHE_HOME
                 .as_ref()?
                 .with_suffix(join!(&[PACKAGE_NAME, "images"], path::MAIN_SEPARATOR_STR)),
@@ -48,7 +54,6 @@ impl HostDirectories {
             staging: XDG_DATA_HOME
                 .as_ref()?
                 .with_suffix(join!(&[PACKAGE_NAME, "staging"], path::MAIN_SEPARATOR_STR)),
-
             lock_file: XDG_DATA_HOME.as_ref()?.with_suffix(join!(
                 &[PACKAGE_NAME, "install-lock.toml"],
                 path::MAIN_SEPARATOR_STR

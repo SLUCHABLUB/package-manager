@@ -1,3 +1,5 @@
+// TODO: Rename this file to cache.rs
+
 use crate::DownloadLock;
 use crate::HostDirectories;
 use crate::HostPath;
@@ -14,6 +16,26 @@ use std::path::Path;
 use tracing::info;
 use tracing::warn;
 use url::Url;
+
+pub(crate) fn find_cached_download_lock_or_create(
+    recipe: &Recipe,
+    host: &HostDirectories,
+) -> anyhow::Result<DownloadLock> {
+    // TODO: Base this on the recipe (data?) hash.
+    // TODO: Add a with_suffix_and_extension method.
+    let path = host
+        .download_locks
+        .with_suffix(format!("{}.toml", recipe.name()));
+
+    Ok(if path.exists() {
+        info!("using the cached lock");
+        DownloadLock::read_from(&path, host)?
+    } else {
+        let lock = recipe.lock(host)?;
+        lock.write_to(&path)?;
+        lock
+    })
+}
 
 pub(super) fn find_cached_repository_or_initialise(
     url: &Url,
@@ -101,7 +123,7 @@ impl BuildWorkingDirectory {
         host: &HostDirectories,
     ) -> anyhow::Result<BuildWorkingDirectory> {
         // TODO: Base this on the recipe hash.
-        let path = host.working.with_suffix(&*recipe.name);
+        let path = host.working.with_suffix(recipe.name());
 
         make_empty_directory(&path)?;
 
@@ -119,7 +141,7 @@ impl Image {
         host: &HostDirectories,
     ) -> anyhow::Result<Result<Image, Box<HostPath>>> {
         // TODO: Base this on the recipe hash.
-        let path = host.images.with_suffix(&*recipe.name);
+        let path = host.images.with_suffix(recipe.name());
 
         Ok(if is_directory_populated(&path)? {
             info!("using the cached package image");

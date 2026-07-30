@@ -1,8 +1,6 @@
 use crate::HostPath;
-use crate::Resolver;
 use crate::Source;
 use crate::Version;
-use crate::VersionRequirement;
 use anyhow::Context as _;
 use anyhow::bail;
 use bstr::BStr;
@@ -82,7 +80,7 @@ pub(in crate::download) fn download_git(
 pub(crate) fn resolve_commit(
     repository: &Repository,
     url: &Url,
-    version: &VersionRequirement,
+    version: &Version,
 ) -> anyhow::Result<ObjectId> {
     let mut progress = Discard;
 
@@ -98,14 +96,12 @@ pub(crate) fn resolve_commit(
         .ref_map(&mut progress, ref_map::Options::default())
         .context("fetching references")?;
 
-    let mut resolver = Resolver::from_requirement(version);
-
     for reference in &references.remote_refs {
         let Some((tag_name, commit)) = to_tag(reference) else {
             continue;
         };
 
-        let version = match parse_version(tag_name) {
+        let tag_version = match parse_version(tag_name) {
             Ok(version) => version,
             Err(error) => {
                 warn!("skipping the tag `{tag_name}` due to an error: {:#}", error);
@@ -113,14 +109,12 @@ pub(crate) fn resolve_commit(
             }
         };
 
-        resolver.add_option(commit, version);
+        if tag_version == *version {
+            return Ok(commit);
+        }
     }
 
-    let Some(commit) = resolver.best() else {
-        bail!("could not find a tag matching the version {version}");
-    };
-
-    Ok(commit)
+    bail!("could not find a tag matching the version {version}");
 }
 
 fn to_tag(reference: &Ref) -> Option<(&BStr, ObjectId)> {

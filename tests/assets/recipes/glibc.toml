@@ -4,7 +4,6 @@ version = "2.43"
 
 [download.tarball_index]
 url = "https://ftpmirror.gnu.org/gnu/glibc/"
-version.exact = "2.43"
 file_name_prefix = "glibc-"
 
 [build]

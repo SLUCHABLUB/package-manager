@@ -1,9 +1,7 @@
-version = "1.9"
+version = "1.9.6"
 
 [download.github]
 repository = "libgit2/libgit2"
-# TODO: Use a range
-version.exact = "1.9.4"
 
 [build]
 # TODO: CMake.

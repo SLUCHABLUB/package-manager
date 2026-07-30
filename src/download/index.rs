@@ -1,7 +1,5 @@
 use crate::Compression;
-use crate::Resolver;
 use crate::Version;
-use crate::VersionRequirement;
 use crate::download::split_tarball_file_name;
 use anyhow::Context as _;
 use anyhow::bail;
@@ -21,7 +19,7 @@ pub(crate) struct IndexedFile {
 #[context("finding a file matching version {version} in the index at `{index}`")]
 pub(crate) fn find_in_index(
     index: &Url,
-    version: &VersionRequirement,
+    version: &Version,
     file_name_prefix: &str,
 ) -> anyhow::Result<IndexedFile> {
     let response = reqwest::blocking::get(index.clone())?;
@@ -37,8 +35,7 @@ pub(crate) fn find_in_index(
 
     let dom = tl::parse(string, ParserOptions::new()).context("parsing the HTML")?;
 
-    // TODO: Set favouring of compression types.
-    let mut resolver = Resolver::from_requirement(version);
+    let mut best = None;
 
     // TODO: Sprinkle in some logs.
     for node in dom.nodes() {
@@ -63,16 +60,18 @@ pub(crate) fn find_in_index(
             continue;
         };
 
-        let Some(version) = basename.strip_prefix(file_name_prefix) else {
+        let Some(file_version) = basename.strip_prefix(file_name_prefix) else {
             continue;
         };
 
-        let version = Version::from(version);
+        let file_version = Version::from(file_version);
 
-        resolver.add_option((file_name, compression), version);
+        if file_version == *version {
+            best = Some((file_name, compression));
+        }
     }
 
-    let Some((file_name, compression)) = resolver.best() else {
+    let Some((file_name, compression)) = best else {
         bail!("no file matching version {version} was found");
     };
 

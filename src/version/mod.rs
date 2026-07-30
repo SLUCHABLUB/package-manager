@@ -1,5 +1,4 @@
 mod requirement;
-mod resolver;
 mod semantic;
 
 use crate::ResultExtension;
@@ -9,7 +8,6 @@ use std::fmt::Display;
 use std::str::FromStr;
 
 pub(crate) use requirement::VersionRequirement;
-pub(crate) use resolver::Resolver;
 pub(crate) use semantic::SemanticVersion;
 
 #[derive(Eq, PartialEq, Debug, Clone, Serialize, Deserialize)]

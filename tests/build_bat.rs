@@ -6,6 +6,7 @@ use assert::ResultExtension as _;
 use assert_cmd::cargo::CommandCargoExt as _;
 use fs_err as fs;
 use fs_err::create_dir_all;
+use std::env;
 use std::path::Path;
 use std::process::Command;
 use tap::Pipe as _;
@@ -40,6 +41,14 @@ fn build_bat() {
         ])
         // TODO: Figure out what to do with this.
         .env("PATH", env!("PATH"))
+        .envs(
+            [
+                env::var_os("RUST_BACKTRACE").map(|value| ("RUST_BACKTRACE", value)),
+                env::var_os("RUST_LIB_BACKTRACE").map(|value| ("RUST_LIB_BACKTRACE", value)),
+            ]
+            .into_iter()
+            .flatten(),
+        )
         .status()
         .assert_ok()
         .success()

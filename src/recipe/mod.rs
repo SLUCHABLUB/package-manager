@@ -8,10 +8,12 @@ pub(crate) use directories::BuildRoot;
 pub(crate) use directories::BuildWorkingDirectory;
 pub(crate) use directories::Image;
 pub(crate) use directories::Source;
+pub(crate) use directories::find_cached_download_lock_or_create;
 pub(crate) use download::Compression;
 pub(crate) use download::Download;
 pub(crate) use download::DownloadLock;
 
+use crate::HostDirectories;
 use crate::HostPath;
 use crate::Version;
 use crate::VersionRequirement;
@@ -24,6 +26,7 @@ use serde::Serialize;
 use serde_with::serde_as;
 use std::collections::HashMap;
 use std::fmt::Display;
+use tracing::info;
 
 #[derive(Debug)]
 pub(crate) struct Recipe {
@@ -63,16 +66,18 @@ impl Recipe {
         &self.data.version
     }
 
-    pub(crate) fn download_data(&self) -> &Download {
-        &self.data.download
-    }
-
     pub(crate) fn build_data(&self) -> &Build {
         &self.data.build
     }
 
     pub(crate) fn dependencies(&self) -> &Dependencies {
         &self.data.dependencies
+    }
+
+    #[context("locking {self}")]
+    pub(crate) fn lock(&self, host: &HostDirectories) -> anyhow::Result<DownloadLock> {
+        info!("locking {self}");
+        self.data.download.lock(host, &self.data.version)
     }
 }
 

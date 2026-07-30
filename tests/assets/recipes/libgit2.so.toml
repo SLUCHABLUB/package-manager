@@ -1,0 +1,8 @@
+version = "1.9"
+
+download = "none"
+build.system = "none"
+
+[dependencies]
+# TODO: Use a range.
+libgit2.exact = "1.9.6"

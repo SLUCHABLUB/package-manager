@@ -1,5 +1,4 @@
 use once_cell::race::OnceBool;
-use std::any::TypeId;
 use std::env;
 use std::ffi::OsStr;
 use tracing::error;
@@ -29,11 +28,9 @@ where
             },
         });
 
-        let is_anyhow = TypeId::of::<E>() == TypeId::of::<anyhow::Error>();
-
         match self {
             Ok(value) => Some(value),
-            Err(error) if is_anyhow && backtrace => {
+            Err(error) if backtrace => {
                 error!("{:?}", error.into());
                 None
             }

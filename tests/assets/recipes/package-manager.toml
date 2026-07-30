@@ -1,9 +1,0 @@
-version = "dev"
-
-[download.github]
-repository = "sluchablub/package-manager"
-version = "any"
-
-[build]
-system = "cargo"
-binary = "package-manager"

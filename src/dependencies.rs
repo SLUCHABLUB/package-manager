@@ -124,9 +124,12 @@ fn parse_so_requirement(file_name: &str) -> anyhow::Result<(Box<str>, VersionReq
 
 #[context("parsing the shared object file name")]
 fn parse_so_provision(file_name: &str) -> anyhow::Result<(Box<str>, Version)> {
-    let (name, suffix) = file_name
-        .split_once(".so")
-        .context("splitting on the `.so` extension")?;
+    let name_end = file_name
+        .rfind(".so")
+        .context("finding the `.so` extension")?
+        + ".so".len();
+
+    let (name, suffix) = file_name.split_at(name_end);
 
     let name = Box::from(name);
 

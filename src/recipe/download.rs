@@ -1,11 +1,13 @@
 use crate::HostDirectories;
+use crate::HostPath;
 use crate::IndexedFile;
-use crate::VersionRequirement;
+use crate::Version;
 use crate::detect_tarball_compression;
 use crate::find_in_index;
 use crate::recipe::find_cached_repository_or_initialise;
 use crate::resolve_commit;
 use anyhow::bail;
+use fs_err as fs;
 use gix::ObjectId;
 use gix::Repository;
 use serde::Deserialize;
@@ -18,7 +20,6 @@ pub(crate) enum Download {
     None,
     Github {
         repository: Box<str>,
-        version: VersionRequirement,
     },
     Tarball {
         url: Url,
@@ -26,19 +27,19 @@ pub(crate) enum Download {
     },
     TarballIndex {
         url: Url,
-        version: VersionRequirement,
         file_name_prefix: Box<str>,
     },
 }
 
 impl Download {
-    pub(crate) fn lock(&self, host: &HostDirectories) -> anyhow::Result<DownloadLock> {
+    pub(crate) fn lock(
+        &self,
+        host: &HostDirectories,
+        version: &Version,
+    ) -> anyhow::Result<DownloadLock> {
         Ok(match self {
             Download::None => DownloadLock::None,
-            Download::Github {
-                repository,
-                version,
-            } => {
+            Download::Github { repository } => {
                 let url = format!("https://github.com/{repository}.git");
                 let url = Url::parse(&url)?;
 
@@ -67,7 +68,6 @@ impl Download {
             }
             Download::TarballIndex {
                 url,
-                version,
                 file_name_prefix,
             } => {
                 let IndexedFile {
@@ -103,13 +103,16 @@ impl Compression {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub(crate) enum DownloadLock {
+    #[serde(skip)]
     None,
     Git {
         url: Url,
         commit: ObjectId,
         // Boxed so clippy doesn't complain about it's size.
+        #[serde(skip_serializing)]
         repository: Box<Repository>,
     },
     Tarball {
@@ -117,4 +120,57 @@ pub(crate) enum DownloadLock {
         virtual_url: Option<Url>,
         compression: Compression,
     },
+}
+
+impl DownloadLock {
+    pub(crate) fn read_from(
+        path: &HostPath,
+        host: &HostDirectories,
+    ) -> anyhow::Result<DownloadLock> {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "snake_case")]
+        enum DownloadLockSerial {
+            Git {
+                url: Url,
+                commit: ObjectId,
+            },
+            Tarball {
+                real_url: Url,
+                virtual_url: Option<Url>,
+                compression: Compression,
+            },
+        }
+
+        let file_contents = fs::read_to_string(path)?;
+        let serial = toml::from_str::<DownloadLockSerial>(&file_contents)?;
+
+        Ok(match serial {
+            DownloadLockSerial::Git { url, commit } => DownloadLock::Git {
+                repository: Box::new(find_cached_repository_or_initialise(&url, host)?),
+                url,
+                commit,
+            },
+
+            DownloadLockSerial::Tarball {
+                real_url,
+                virtual_url,
+                compression,
+            } => DownloadLock::Tarball {
+                real_url,
+                virtual_url,
+                compression,
+            },
+        })
+    }
+
+    pub(crate) fn write_to(&self, path: &HostPath) -> anyhow::Result<()> {
+        if matches!(self, DownloadLock::None) {
+            return Ok(());
+        }
+
+        let serialised = toml::to_string(self)?;
+        fs::write(path, serialised.as_bytes())?;
+
+        Ok(())
+    }
 }
