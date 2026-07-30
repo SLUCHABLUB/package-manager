@@ -24,7 +24,7 @@ reqwest = { version = "0.13.4", default-features = false, features = ["rustls-no
 rustls-rustcrypto = "0.0.2-alpha"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_with = "3.21.0"
-show-option = { git = "https://github.com/SLUCHABLUB/show-option", branch = "fix-no-default-features", version = "0.2.0", default-features = false }
+show-option = { git = "https://github.com/kriomant/show-option", version = "0.2.0", default-features = false }
 tar = "0.4.46"
 toml = { version = "1.1.2", features = ["preserve_order"] }
 tracing = "0.1.44"
