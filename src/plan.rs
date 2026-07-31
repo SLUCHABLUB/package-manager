@@ -16,42 +16,58 @@ use crate::stage;
 use fn_error_context::context;
 use tracing::info;
 
+#[derive(Debug)]
 struct LockedRecipe {
     recipe: &'static Recipe,
     lock: DownloadLock,
 }
 
+#[derive(Debug)]
 pub(crate) struct DownloadPlan {
     // TODO: Make this a DAG (for build dependencies).
     recipes: Vec<LockedRecipe>,
 }
 
+#[derive(Debug)]
 struct DownloadedRecipe {
     recipe: &'static Recipe,
     source: Source,
 }
 
-pub(crate) struct BuildPlan {
-    recipes: Vec<DownloadedRecipe>,
+#[derive(Debug)]
+struct InstalledRecipe {
+    ledger: ImageLedger,
 }
 
+#[derive(Debug)]
+pub(crate) struct BuildPlan {
+    recipes: Vec<DownloadedRecipe>,
+    installed_recipes: Vec<InstalledRecipe>,
+}
+
+#[derive(Debug)]
 struct BuiltRecipe {
     recipe: &'static Recipe,
     image: Image,
 }
 
+#[derive(Debug)]
 pub(crate) struct CheckPlan {
     recipes: Vec<BuiltRecipe>,
+    installed_recipes: Vec<InstalledRecipe>,
 }
 
+#[derive(Debug)]
 struct CheckedRecipe {
     recipe: &'static Recipe,
     image: Image,
     ledger: ImageLedger,
 }
 
+#[derive(Debug)]
 pub(crate) struct StagePlan {
     recipes: Vec<CheckedRecipe>,
+    installed_recipes: Vec<InstalledRecipe>,
 }
 
 impl DownloadPlan {
@@ -68,8 +84,8 @@ impl DownloadPlan {
         })
     }
 
-    #[context("adding package `{name}` version {version} to the download plan")]
-    pub(crate) fn add_package(
+    #[context("adding a recipe for `{name}` version {version} to the download plan")]
+    pub(crate) fn add_recipe(
         &mut self,
         name: &str,
         version: &VersionRequirement,
@@ -83,7 +99,7 @@ impl DownloadPlan {
         let recipe = recipes.find(name, version)?;
 
         for (dependency, version) in &recipe.dependencies().versions {
-            self.add_package(dependency, version, recipes, host)?;
+            self.add_recipe(dependency, version, recipes, host)?;
         }
 
         let locked = LockedRecipe {
@@ -115,6 +131,8 @@ impl DownloadPlan {
 
         Ok(BuildPlan {
             recipes: downloaded_recipes,
+            // TODO: Look at what is installed (and compare the hashes).
+            installed_recipes: Vec::new(),
         })
     }
 }
@@ -143,6 +161,7 @@ impl BuildPlan {
 
         Ok(CheckPlan {
             recipes: built_recipes,
+            installed_recipes: self.installed_recipes,
         })
     }
 }
@@ -168,6 +187,7 @@ impl CheckPlan {
 
         Ok(StagePlan {
             recipes: checked_recipes,
+            installed_recipes: self.installed_recipes,
         })
     }
 }
@@ -178,13 +198,17 @@ impl StagePlan {
         host: &HostDirectories,
         target: &TargetDirectories,
     ) -> anyhow::Result<SystemLedger> {
-        let ledger = stage(
+        let mut ledger = stage(
             self.recipes
                 .into_iter()
                 .map(|checked| (checked.recipe, checked.image, checked.ledger)),
             host,
             target,
         )?;
+
+        for installed in self.installed_recipes {
+            ledger.add_image(installed.ledger);
+        }
 
         Ok(ledger)
     }

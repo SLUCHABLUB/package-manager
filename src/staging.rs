@@ -47,6 +47,8 @@ fn stage_single(
     host: &HostDirectories,
     system_ledger: &mut SystemLedger,
 ) -> anyhow::Result<()> {
+    info!("staging {recipe}");
+
     let Image(image) = image;
 
     for (entry, _hash) in image_ledger.files() {

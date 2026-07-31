@@ -5,7 +5,6 @@ use crate::Recipe;
 use crate::TargetDirectories;
 use crate::TargetPath;
 use crate::Version;
-use crate::VersionRequirement;
 use anyhow::Context;
 use const_str::join;
 use fn_error_context::context;
@@ -39,16 +38,6 @@ impl SystemLedger {
 
     pub(crate) fn path(&self) -> &TargetPath {
         &self.path
-    }
-
-    pub(crate) fn contains(
-        &self,
-        package_name: &str,
-        version_requirement: &VersionRequirement,
-    ) -> bool {
-        self.data.packages.iter().any(|package| {
-            &*package.name == package_name && package.version.satisfies(version_requirement)
-        })
     }
 
     pub(crate) fn add_image(&mut self, recipe: ImageLedger) {

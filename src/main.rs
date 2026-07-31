@@ -78,10 +78,10 @@ fn try_main(arguments: Arguments) -> anyhow::Result<()> {
             let manifest = HostPath::from_cwd_relative(&manifest)?;
             let manifest = Manifest::read_from(manifest)?;
 
-            let old_ledger = SystemLedger::read_from_host(&target_directories)?;
+            let _old_ledger = SystemLedger::read_from_host(&target_directories)?;
             let recipes = leak(manifest.create_recipe_store());
 
-            let download_plan = manifest.update(&old_ledger, recipes, &host_directories)?;
+            let download_plan = manifest.update(recipes, &host_directories)?;
             let build_plan = download_plan.download(&host_directories)?;
             let check_plan = build_plan.build(&target_directories, &host_directories)?;
             let stage_plan = check_plan.check()?;

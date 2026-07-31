@@ -2,7 +2,6 @@ use crate::HostDirectories;
 use crate::HostPath;
 use crate::Recipe;
 use crate::ResultExtension as _;
-use crate::SystemLedger;
 use crate::VersionRequirement;
 use crate::plan::DownloadPlan;
 use crate::recipe_store::RecipeStore;
@@ -89,16 +88,13 @@ impl Manifest {
 
     pub(crate) fn update(
         &self,
-        installed: &SystemLedger,
         recipes: &'static RecipeStore,
         host: &HostDirectories,
     ) -> anyhow::Result<DownloadPlan> {
         let mut plan = DownloadPlan::new();
 
         for (name, version) in self.packages() {
-            if !installed.contains(name, version) {
-                plan.add_package(name, version, recipes, host)?;
-            }
+            plan.add_recipe(name, version, recipes, host)?;
         }
 
         Ok(plan)

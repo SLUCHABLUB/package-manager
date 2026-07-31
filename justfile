@@ -1,15 +1,19 @@
 set ignore-comments
 
-test:
-    cargo test
-    @just ui-tests/test-all
-
-clean:
-    cargo clean
-    @just ui-tests/clean-all
-
 offline-clean-tests:
-    @just ui-tests/offline-clean-all
+    rm -rf target/tmp/build-bat-root/cache/build
+    rm -rf target/tmp/build-bat-root/cache/images
+
+    @just clean-test-installation
+
+clean-test-installation:
+    rm -rf target/tmp/build-bat-root/home/.local
+    rm -rf target/tmp/build-bat-root/configuration
+    rm -rf target/tmp/build-bat-root/data
+    rm -rf target/tmp/build-bat-root/executables
+    rm -rf target/tmp/build-bat-root/headers
+    rm -rf target/tmp/build-bat-root/libraries
+    rm -rf target/tmp/build-bat-root/state
 
 cross-check:
     # TODO: Test the ones with no docker images.
