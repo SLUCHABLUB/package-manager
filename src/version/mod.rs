@@ -10,7 +10,7 @@ use std::str::FromStr;
 pub(crate) use requirement::VersionRequirement;
 pub(crate) use semantic::SemanticVersion;
 
-#[derive(Eq, PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
 pub(crate) struct Version {
     pub string: Box<str>,

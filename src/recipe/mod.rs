@@ -24,7 +24,7 @@ use fs_err::read_to_string;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_with::serde_as;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::Display;
 use tracing::info;
 
@@ -70,6 +70,10 @@ impl Recipe {
         &self.data.build
     }
 
+    pub(crate) fn download_data(&self) -> &Download {
+        &self.data.download
+    }
+
     pub(crate) fn dependencies(&self) -> &Dependencies {
         &self.data.dependencies
     }
@@ -88,7 +92,7 @@ impl Display for Recipe {
 }
 
 #[serde_as]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Hash, Debug, Serialize, Deserialize)]
 struct RecipeData {
     version: Version,
 
@@ -100,8 +104,8 @@ struct RecipeData {
 }
 
 // TODO: Make this opaque and add a `PackageRequirement` type.
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Hash, Debug, Default, Serialize, Deserialize)]
 pub(crate) struct Dependencies {
     #[serde(flatten)]
-    pub versions: HashMap<Box<str>, VersionRequirement>,
+    pub versions: BTreeMap<Box<str>, VersionRequirement>,
 }

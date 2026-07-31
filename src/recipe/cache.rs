@@ -2,6 +2,7 @@ use crate::DownloadLock;
 use crate::HostDirectories;
 use crate::HostPath;
 use crate::Recipe;
+use crate::hash;
 use anyhow::Context as _;
 use anyhow::bail;
 use fs_err::create_dir_all;
@@ -19,11 +20,11 @@ pub(crate) fn find_cached_download_lock_or_create(
     recipe: &Recipe,
     host: &HostDirectories,
 ) -> anyhow::Result<DownloadLock> {
-    // TODO: Base this on the recipe (data?) hash.
-    // TODO: Add a with_suffix_and_extension method.
-    let path = host
-        .download_locks
-        .with_suffix(format!("{}.toml", recipe.name()));
+    let path = host.download_locks.with_suffix(format!(
+        "{}-{}.toml",
+        hash((recipe.version(), recipe.download_data())),
+        recipe.name()
+    ));
 
     Ok(if path.exists() {
         info!("using the cached lock");

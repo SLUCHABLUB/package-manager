@@ -1,10 +1,10 @@
 use crate::Dependencies;
 use serde::Deserialize;
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::Path;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Hash, Debug, Serialize, Deserialize)]
 pub(crate) struct Build {
     #[serde(default)]
     pub dependencies: Dependencies,
@@ -12,13 +12,13 @@ pub(crate) struct Build {
     pub directory: Option<Box<Path>>,
 
     // TODO: The keys and values should be `OsStr`s but those serialise weirdly.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub environment_variables: HashMap<Box<str>, Box<str>>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub environment_variables: BTreeMap<Box<str>, Box<str>>,
     #[serde(flatten)]
     pub system: BuildSystem,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Hash, Debug, Serialize, Deserialize)]
 #[serde(tag = "system", rename_all = "snake_case")]
 pub(crate) enum BuildSystem {
     None,

@@ -14,7 +14,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use url::Url;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Hash, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Download {
     None,
@@ -86,7 +86,7 @@ impl Download {
     }
 }
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Hash, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Compression {
     None,

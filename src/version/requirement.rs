@@ -5,7 +5,7 @@ use serde::Serialize;
 use std::fmt::Display;
 use std::str::FromStr as _;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Hash, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum VersionRequirement {
     Exact(Version),

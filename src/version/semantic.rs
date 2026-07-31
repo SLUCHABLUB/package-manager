@@ -6,7 +6,7 @@ use std::fmt::Display;
 use std::str::FromStr;
 
 #[derive(
-    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, SerializeDisplay, DeserializeFromStr,
+    Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Debug, SerializeDisplay, DeserializeFromStr,
 )]
 pub(crate) struct SemanticVersion([u64; 3]);
 
