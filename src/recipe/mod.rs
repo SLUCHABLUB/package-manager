@@ -26,6 +26,7 @@ use serde::Serialize;
 use serde_with::serde_as;
 use std::collections::BTreeMap;
 use std::fmt::Display;
+use std::hash::Hash;
 use tracing::info;
 
 #[derive(Debug)]

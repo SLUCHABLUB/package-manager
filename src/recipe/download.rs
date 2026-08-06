@@ -7,6 +7,7 @@ use crate::find_in_index;
 use crate::recipe::find_cached_repository_or_initialise;
 use crate::resolve_commit;
 use anyhow::bail;
+use derive_where::derive_where;
 use fs_err as fs;
 use gix::ObjectId;
 use gix::Repository;
@@ -104,6 +105,7 @@ impl Compression {
 }
 
 #[derive(Debug, Serialize)]
+#[derive_where(Hash)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum DownloadLock {
     #[serde(skip)]
@@ -113,9 +115,12 @@ pub(crate) enum DownloadLock {
         commit: ObjectId,
         // Boxed so clippy doesn't complain about it's size.
         #[serde(skip_serializing)]
+        #[derive_where(skip(Hash))]
         repository: Box<Repository>,
     },
     Tarball {
+        // TODO: Switch the option between these two.
+        #[derive_where(skip(Hash))]
         real_url: Url,
         virtual_url: Option<Url>,
         compression: Compression,

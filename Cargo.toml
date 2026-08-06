@@ -9,8 +9,11 @@ repository = "https://github.com/SLUCHABLUB/package-manager"
 anyhow = "1.0.102"
 astral-tl = "0.7.11"
 bstr = "1.12.1"
+by_address = "1.2.1"
 clap = { version = "4.6.1", features = ["derive"] }
 const-str = { version = "1.1.0", features = ["proc"] }
+daggy = "0.9.0"
+derive-where = "1.6.1"
 fn-error-context = "0.2.1"
 fs-err = "3.3.0"
 gix = { version = "0.84.0", features = ["blocking-http-transport-reqwest", "serde"] }

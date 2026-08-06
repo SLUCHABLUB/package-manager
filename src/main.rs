@@ -33,6 +33,7 @@ pub(crate) use ledger::SystemLedger;
 pub(crate) use manifest::Manifest;
 pub(crate) use path::HostPath;
 pub(crate) use path::TargetPath;
+pub(crate) use plan::LockPlan;
 pub(crate) use recipe::BuildRoot;
 pub(crate) use recipe::BuildSystem;
 pub(crate) use recipe::BuildWorkingDirectory;
@@ -83,7 +84,9 @@ fn try_main(arguments: Arguments) -> anyhow::Result<()> {
             let _old_ledger = SystemLedger::read_from_host(&target_directories)?;
             let recipes = leak(manifest.create_recipe_store());
 
-            let download_plan = manifest.update(recipes, &host_directories)?;
+            let lock_plan = manifest.update(recipes)?;
+            let hash_plan = lock_plan.lock(&host_directories)?;
+            let download_plan = hash_plan.hash();
             let build_plan = download_plan.download(&host_directories)?;
             let check_plan = build_plan.build(&target_directories, &host_directories)?;
             let stage_plan = check_plan.check()?;

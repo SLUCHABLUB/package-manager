@@ -1,9 +1,8 @@
-use crate::HostDirectories;
 use crate::HostPath;
+use crate::LockPlan;
 use crate::Recipe;
 use crate::ResultExtension as _;
 use crate::VersionRequirement;
-use crate::plan::DownloadPlan;
 use crate::recipe_store::RecipeStore;
 use anyhow::Context;
 use fs_err::read_dir;
@@ -86,15 +85,11 @@ impl Manifest {
             .map(|(package, version)| (&**package, version))
     }
 
-    pub(crate) fn update(
-        &self,
-        recipes: &'static RecipeStore,
-        host: &HostDirectories,
-    ) -> anyhow::Result<DownloadPlan> {
-        let mut plan = DownloadPlan::new();
+    pub(crate) fn update(&self, recipes: &'static RecipeStore) -> anyhow::Result<LockPlan> {
+        let mut plan = LockPlan::new();
 
         for (name, version) in self.packages() {
-            plan.add_recipe(name, version, recipes, host)?;
+            plan.add_recipe(name, version, recipes)?;
         }
 
         Ok(plan)
