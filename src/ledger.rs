@@ -1,3 +1,4 @@
+use crate::HostDirectories;
 use crate::HostPath;
 use crate::Image;
 use crate::PACKAGE_NAME;
@@ -73,11 +74,11 @@ impl SystemLedger {
 
     pub(crate) fn read_from_host(
         target: &TargetDirectories,
-        install_root: &HostPath,
+        host: &HostDirectories,
     ) -> anyhow::Result<SystemLedger> {
         let mut ledger = SystemLedger::new(target);
 
-        let serialised = match fs::read_to_string(ledger.path.with_root(install_root)) {
+        let serialised = match fs::read_to_string(ledger.path.with_root(&host.installation_root)) {
             // We return an empty ledger if the file is not found.
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(ledger),
             result => result?,

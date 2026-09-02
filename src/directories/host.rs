@@ -1,7 +1,7 @@
 use crate::HostPath;
 use crate::PACKAGE_NAME;
+use crate::TargetDirectories;
 use crate::directories::XDG_CACHE_HOME;
-use crate::directories::XDG_DATA_HOME;
 use anyhow::Context;
 use const_str::join;
 use std::path;
@@ -24,49 +24,59 @@ pub(crate) struct HostDirectories {
     pub(crate) journal_file: Box<HostPath>,
     /// The directory containing the journal file.
     pub(crate) journal_directory: Box<HostPath>,
+
+    pub(crate) installation_root: Box<HostPath>,
 }
 
 impl HostDirectories {
-    pub(crate) fn new() -> anyhow::Result<HostDirectories> {
-        Self::new_inner().context("detecting the host directories")
+    pub(crate) fn new(
+        target: &TargetDirectories,
+        installation_root: Box<HostPath>,
+    ) -> anyhow::Result<HostDirectories> {
+        Self::new_inner(target, installation_root).context("detecting the host directories")
     }
 
-    fn new_inner() -> Option<HostDirectories> {
+    fn new_inner(
+        target: &TargetDirectories,
+        installation_root: Box<HostPath>,
+    ) -> Option<HostDirectories> {
         // TODO: Don't use XDG_DATA_HOME,
         // use a directory dependent on the target directories and installation root.
 
+        let cache_directory = XDG_CACHE_HOME.as_ref()?;
+
+        let data_directory = target.data().with_root(&installation_root);
+
         Some(HostDirectories {
-            download_locks: XDG_CACHE_HOME.as_ref()?.with_suffix(join!(
+            download_locks: cache_directory.with_suffix(join!(
                 &[PACKAGE_NAME, "download-locks"],
                 path::MAIN_SEPARATOR_STR
             )),
-            repositories: XDG_CACHE_HOME.as_ref()?.with_suffix(join!(
+            repositories: cache_directory.with_suffix(join!(
                 &[PACKAGE_NAME, "repositories"],
                 path::MAIN_SEPARATOR_STR
             )),
-            sources: XDG_CACHE_HOME
-                .as_ref()?
+            sources: cache_directory
                 .with_suffix(join!(&[PACKAGE_NAME, "sources"], path::MAIN_SEPARATOR_STR)),
-            working: XDG_CACHE_HOME
-                .as_ref()?
+            working: cache_directory
                 .with_suffix(join!(&[PACKAGE_NAME, "build"], path::MAIN_SEPARATOR_STR)),
 
-            images: XDG_CACHE_HOME
-                .as_ref()?
+            images: cache_directory
                 .with_suffix(join!(&[PACKAGE_NAME, "images"], path::MAIN_SEPARATOR_STR)),
 
-            staging: XDG_DATA_HOME
-                .as_ref()?
+            staging: data_directory
                 .with_suffix(join!(&[PACKAGE_NAME, "staging"], path::MAIN_SEPARATOR_STR)),
-            lock_file: XDG_DATA_HOME.as_ref()?.with_suffix(join!(
+            lock_file: data_directory.with_suffix(join!(
                 &[PACKAGE_NAME, "install-lock.toml"],
                 path::MAIN_SEPARATOR_STR
             )),
-            journal_file: XDG_DATA_HOME.as_ref()?.with_suffix(join!(
+            journal_file: data_directory.with_suffix(join!(
                 &[PACKAGE_NAME, "install-journal.toml"],
                 path::MAIN_SEPARATOR_STR
             )),
-            journal_directory: XDG_DATA_HOME.as_ref()?.with_suffix(PACKAGE_NAME),
+            journal_directory: data_directory.with_suffix(PACKAGE_NAME),
+
+            installation_root,
         })
     }
 }
