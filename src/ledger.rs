@@ -71,10 +71,13 @@ impl SystemLedger {
         Ok(())
     }
 
-    pub(crate) fn read_from_host(target: &TargetDirectories) -> anyhow::Result<SystemLedger> {
+    pub(crate) fn read_from_host(
+        target: &TargetDirectories,
+        install_root: &HostPath,
+    ) -> anyhow::Result<SystemLedger> {
         let mut ledger = SystemLedger::new(target);
 
-        let serialised = match fs::read_to_string(ledger.path.to_host_path()) {
+        let serialised = match fs::read_to_string(ledger.path.with_root(install_root)) {
             // We return an empty ledger if the file is not found.
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(ledger),
             result => result?,

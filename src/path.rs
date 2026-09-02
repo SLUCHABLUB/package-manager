@@ -227,11 +227,6 @@ impl TargetPath {
         root.with_suffix(relative)
     }
 
-    pub(crate) fn to_host_path(&self) -> &HostPath {
-        let TargetPath(absolute) = self;
-        HostPath::from_absolute(absolute)
-    }
-
     // This is deliberately not `AsRef` to avoid accidental misuse.
     fn to_path(&self) -> &Path {
         let TargetPath(AbsolutePath(path)) = self;

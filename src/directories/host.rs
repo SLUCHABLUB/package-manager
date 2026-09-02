@@ -15,6 +15,7 @@ pub(crate) struct HostDirectories {
     pub(crate) working: Box<HostPath>,
     pub(crate) images: Box<HostPath>,
 
+    // TODO: This should depend on the install location/installation root.
     // TODO: Use RAII for this.
     pub(crate) staging: Box<HostPath>,
 
@@ -31,6 +32,9 @@ impl HostDirectories {
     }
 
     fn new_inner() -> Option<HostDirectories> {
+        // TODO: Don't use XDG_DATA_HOME,
+        // use a directory dependent on the target directories and installation root.
+
         Some(HostDirectories {
             download_locks: XDG_CACHE_HOME.as_ref()?.with_suffix(join!(
                 &[PACKAGE_NAME, "download-locks"],

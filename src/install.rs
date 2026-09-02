@@ -1,4 +1,5 @@
 use crate::HostDirectories;
+use crate::HostPath;
 use crate::PACKAGE_NAME;
 use crate::ResultExtension;
 use crate::SystemLedger;
@@ -33,6 +34,7 @@ pub(crate) fn install(
     ledger: SystemLedger,
     host: &HostDirectories,
     target: &TargetDirectories,
+    root: &HostPath,
 ) -> anyhow::Result<()> {
     let lock = lock(host)?;
 
@@ -40,12 +42,12 @@ pub(crate) fn install(
 
     // TODO: Try recover (if the journal exists).
 
-    let old_ledger = SystemLedger::read_from_host(target)?;
+    let old_ledger = SystemLedger::read_from_host(target, root)?;
 
     let mut journal = Journal::new();
 
     for (recipe, file, hash) in ledger.files() {
-        match check_conflict(file, hash, &old_ledger)? {
+        match check_conflict(file, hash, &old_ledger, root)? {
             ConflictCheckResult::New => {
                 journal.operations.push(InstallOperation {
                     file: Box::from(file),
@@ -76,7 +78,7 @@ pub(crate) fn install(
         }
     }
 
-    journal.operations.push(ledger_install(&ledger));
+    journal.operations.push(ledger_install(&ledger, root));
 
     drop(ledger);
 
@@ -96,7 +98,7 @@ pub(crate) fn install(
 
     for operation in &journal.operations {
         let staged = operation.file.with_root(&host.staging);
-        let destination = operation.temporary.to_host_path();
+        let destination = operation.temporary.with_root(root);
 
         if let Some(parent) = destination.parent() {
             // TODO: Handle directory permissions.
@@ -107,9 +109,9 @@ pub(crate) fn install(
     }
 
     for operation in &journal.operations {
-        let old = operation.file.to_host_path();
+        let old = operation.file.with_root(root);
         let destination = match &operation.backup {
-            Some(path) => path.to_host_path(),
+            Some(path) => path.with_root(root),
             None => continue,
         };
 
@@ -117,8 +119,8 @@ pub(crate) fn install(
     }
 
     for operation in &journal.operations {
-        let temporary = operation.temporary.to_host_path();
-        let destination = operation.file.to_host_path();
+        let temporary = operation.temporary.with_root(root);
+        let destination = operation.file.with_root(root);
 
         // TODO: Specialise on linux et al. to use rename2e when there is no backup.
         fs::rename(temporary, destination)?;
@@ -134,7 +136,7 @@ pub(crate) fn install(
 
     for operation in &journal.operations {
         let backup = match &operation.backup {
-            Some(path) => path.to_host_path(),
+            Some(path) => path.with_root(root),
             None => continue,
         };
 
@@ -226,12 +228,13 @@ fn check_conflict(
     file: &TargetPath,
     new_hash: u64,
     old_ledger: &SystemLedger,
+    root: &HostPath,
 ) -> anyhow::Result<ConflictCheckResult> {
-    let host_path = file.to_host_path();
+    let host_path = file.with_root(root);
 
     Ok(if host_path.exists() {
         if let Some(old_hash) = old_ledger.hash(file) {
-            let existing_file = File::open(host_path)?;
+            let existing_file = File::open(&**host_path)?;
             let existing_hash = rapidhash_v3_file(existing_file)?;
 
             if old_hash == existing_hash {
@@ -251,8 +254,8 @@ fn check_conflict(
     })
 }
 
-fn ledger_install(ledger: &SystemLedger) -> InstallOperation {
-    let should_backup = ledger.path().to_host_path().exists();
+fn ledger_install(ledger: &SystemLedger, root: &HostPath) -> InstallOperation {
+    let should_backup = ledger.path().with_root(root).exists();
 
     InstallOperation {
         file: Box::from(ledger.path()),

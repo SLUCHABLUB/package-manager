@@ -77,11 +77,14 @@ fn try_main(arguments: Arguments) -> anyhow::Result<()> {
     let target_directories = TargetDirectories::user()?;
 
     match arguments.action {
-        Action::Update { manifest } => {
+        Action::Update { manifest, root } => {
+            let installation_root = HostPath::from_cwd_relative(&root)?;
+
             let manifest = HostPath::from_cwd_relative(&manifest)?;
             let manifest = Manifest::read_from(manifest)?;
 
-            let _old_ledger = SystemLedger::read_from_host(&target_directories)?;
+            let _old_ledger =
+                SystemLedger::read_from_host(&target_directories, &installation_root)?;
             let recipes = leak(manifest.create_recipe_store());
 
             let lock_plan = manifest.update(recipes)?;
@@ -92,7 +95,12 @@ fn try_main(arguments: Arguments) -> anyhow::Result<()> {
             let stage_plan = check_plan.check()?;
             let new_ledger = stage_plan.stage(&host_directories, &target_directories)?;
 
-            install(new_ledger, &host_directories, &target_directories)?;
+            install(
+                new_ledger,
+                &host_directories,
+                &target_directories,
+                &installation_root,
+            )?;
         }
     }
 

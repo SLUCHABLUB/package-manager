@@ -12,5 +12,7 @@ pub(crate) enum Action {
         // TODO: Allow the use to specify multiple.
         #[arg(long)]
         manifest: Box<Path>,
+        #[arg(long, default_value = "/")]
+        root: Box<Path>,
     },
 }
