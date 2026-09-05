@@ -1,3 +1,4 @@
+install_location = "/usr"
 recipe_directories = ["recipes"]
 
 [packages]

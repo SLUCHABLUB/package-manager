@@ -1,17 +1,17 @@
 use crate::TargetPath;
-use crate::directories::HOME;
-use crate::directories::PREFIX;
 use crate::directories::XDG_BIN_HOME;
 use crate::directories::XDG_CONFIG_HOME;
 use crate::directories::XDG_DATA_HOME;
 use crate::directories::XDG_INCLUDE_HOME;
 use crate::directories::XDG_LIB_HOME;
+use crate::directories::XDG_PREFIX_HOME;
 use crate::directories::XDG_RUNTIME_DIR;
 use crate::directories::XDG_STATE_HOME;
 use anyhow::Context as _;
+use std::path::Path;
 
 pub(crate) struct TargetDirectories {
-    prefix: Box<TargetPath>,
+    prefix: &'static TargetPath,
 
     configuration: &'static TargetPath,
     data: &'static TargetPath,
@@ -30,8 +30,7 @@ impl TargetDirectories {
     }
 
     fn user_inner() -> Option<TargetDirectories> {
-        // TODO: Should we add a "XDG_PREFIX_HOME" variable?
-        let prefix = HOME.as_ref()?.with_suffix(PREFIX).into_target_path();
+        let prefix = XDG_PREFIX_HOME.as_ref()?.to_target_path();
 
         let configuration = XDG_CONFIG_HOME.as_ref()?.to_target_path();
         let data = XDG_DATA_HOME.as_ref()?.to_target_path();
@@ -56,8 +55,25 @@ impl TargetDirectories {
         })
     }
 
+    pub(crate) fn fhs_usr() -> TargetDirectories {
+        let target_path = |path| TargetPath::new(Path::new(path)).expect("path should be absolute");
+
+        TargetDirectories {
+            prefix: target_path("/usr"),
+            configuration: target_path("/etc"),
+            data: target_path("/usr/share"),
+            executables: target_path("/usr/bin"),
+            headers: target_path("/usr/include"),
+            internal_executables: target_path("/usr/libexec"),
+            libraries: target_path("/usr/lib"),
+            runtime: target_path("/run"),
+            state: target_path("/var/lib"),
+            system_executables: target_path("/usr/sbin"),
+        }
+    }
+
     pub(crate) fn prefix(&self) -> &TargetPath {
-        &self.prefix
+        self.prefix
     }
 
     pub(crate) fn configuration(&self) -> &TargetPath {

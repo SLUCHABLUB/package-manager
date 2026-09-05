@@ -51,37 +51,47 @@ pub(crate) use version::SemanticVersion;
 pub(crate) use version::Version;
 pub(crate) use version::VersionRequirement;
 
-pub(crate) const PACKAGE_NAME: &str = env!("CARGO_PKG_NAME");
-
 use anyhow::anyhow;
 use arguments::Action;
 use arguments::Arguments;
 use clap::Parser as _;
+use std::io::stderr;
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::EnvFilter;
+
+pub(crate) const PACKAGE_NAME: &str = env!("CARGO_PKG_NAME");
 
 fn main() {
-    tracing_subscriber::fmt::init();
-
     let arguments = Arguments::parse();
 
     try_main(arguments).ok_or_log();
 }
 
 fn try_main(arguments: Arguments) -> anyhow::Result<()> {
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
+        .from_env()?;
+
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_writer(stderr)
+        .try_init()
+        .map_err(anyhow::Error::from_boxed)?;
+
     // Use a pure rust cryptography provider for rustls to avoid a C-compiler build dependency.
     rustls_rustcrypto::provider()
         .install_default()
         .map_err(|_provider| anyhow!("failed to set the rustls cryptography provider"))?;
 
-    // TODO: Base this on the manifest.
-    let target_directories = TargetDirectories::user()?;
-
     match arguments.action {
         Action::Update { manifest, root } => {
-            let installation_root = HostPath::from_cwd_relative(&root)?;
-            let host_directories = HostDirectories::new(&target_directories, installation_root)?;
-
             let manifest = HostPath::from_cwd_relative(&manifest)?;
             let manifest = Manifest::read_from(manifest)?;
+
+            let target_directories = manifest.target_directories()?;
+
+            let installation_root = HostPath::from_cwd_relative(&root)?;
+            let host_directories = HostDirectories::new(&target_directories, installation_root)?;
 
             let _old_ledger = SystemLedger::read_from_host(&target_directories, &host_directories)?;
             let recipes = leak(manifest.create_recipe_store());

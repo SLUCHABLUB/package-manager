@@ -112,11 +112,6 @@ impl HostPath {
         TargetPath::from_absolute(absolute)
     }
 
-    pub(crate) fn into_target_path(self: Box<Self>) -> Box<TargetPath> {
-        // SAFETY: `HostPath` and `TargetPath` are both `repr(transparent)` around `AbsolutePath`.
-        unsafe { transmute(self) }
-    }
-
     /// Joins a relative path onto the end of this path.
     /// The suffix is assumed to be relative.
     pub(crate) fn with_suffix<Suffix>(&self, suffix: Suffix) -> Box<HostPath>
@@ -206,6 +201,10 @@ impl TargetPath {
     fn from_absolute_boxed(path: Box<AbsolutePath>) -> Box<TargetPath> {
         // SAFETY: `TargetPath` is `repr(transparent)` around `AbsolutePath`.
         unsafe { transmute(path) }
+    }
+
+    pub(crate) fn new(path: &Path) -> Option<&TargetPath> {
+        AbsolutePath::new(path).map(Self::from_absolute)
     }
 
     pub(crate) fn new_boxed(path: Box<Path>) -> Result<Box<TargetPath>, Box<Path>> {

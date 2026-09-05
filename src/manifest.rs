@@ -2,6 +2,7 @@ use crate::HostPath;
 use crate::LockPlan;
 use crate::Recipe;
 use crate::ResultExtension as _;
+use crate::TargetDirectories;
 use crate::VersionRequirement;
 use crate::recipe_store::RecipeStore;
 use anyhow::Context;
@@ -24,6 +25,7 @@ pub(crate) struct Manifest {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ManifestData {
+    install_location: InstallLocation,
     #[serde(default, skip_serializing_if = "<[_]>::is_empty")]
     recipe_directories: Box<[Box<Path>]>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
@@ -94,10 +96,27 @@ impl Manifest {
 
         Ok(plan)
     }
+
+    pub(crate) fn target_directories(&self) -> anyhow::Result<TargetDirectories> {
+        match self.data.install_location {
+            InstallLocation::FileHierarchySystemUniversalSystemResources => {
+                Ok(TargetDirectories::fhs_usr())
+            }
+            InstallLocation::User => TargetDirectories::user(),
+        }
+    }
 }
 
 impl Display for Manifest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "the manifest at `{}`", self.path)
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+enum InstallLocation {
+    #[serde(rename = "/usr")]
+    FileHierarchySystemUniversalSystemResources,
+    #[serde(rename = "/home")]
+    User,
 }

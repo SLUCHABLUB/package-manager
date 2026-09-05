@@ -2,18 +2,14 @@ mod host;
 mod target;
 
 use crate::HostPath;
-use const_str::concat;
 use once_cell::sync::Lazy as LazyLock;
 use std::env;
-use std::path::MAIN_SEPARATOR;
 use std::path::PathBuf;
 use tracing::error;
 use tracing::warn;
 
 pub(crate) use host::HostDirectories;
 pub(crate) use target::TargetDirectories;
-
-const PREFIX: &str = ".local";
 
 static HOME: LazyLock<Option<Box<HostPath>>> = LazyLock::new(|| {
     let Some(buffer) = env::home_dir() else {
@@ -35,31 +31,29 @@ static HOME: LazyLock<Option<Box<HostPath>>> = LazyLock::new(|| {
 
 // TODO: Set the XDG variables on esoteric OSes like darwin and dos.
 
+static XDG_PREFIX_HOME: LazyLock<Option<Box<HostPath>>> =
+    LazyLock::new(|| parse_xdg_variable_or_home("XDG_PREFIX_HOME", ".local"));
+
 static XDG_CACHE_HOME: LazyLock<Option<Box<HostPath>>> =
-    LazyLock::new(|| parse_xdg_variable("XDG_CACHE_HOME", concat!(".cache")));
+    LazyLock::new(|| parse_xdg_variable_or_home("XDG_CACHE_HOME", ".cache"));
 
 static XDG_CONFIG_HOME: LazyLock<Option<Box<HostPath>>> =
-    LazyLock::new(|| parse_xdg_variable("XDG_CONFIG_HOME", concat!(".config")));
+    LazyLock::new(|| parse_xdg_variable_or_home("XDG_CONFIG_HOME", ".config"));
 
 static XDG_DATA_HOME: LazyLock<Option<Box<HostPath>>> =
-    LazyLock::new(|| parse_xdg_variable("XDG_DATA_HOME", concat!(PREFIX, MAIN_SEPARATOR, "share")));
+    LazyLock::new(|| parse_xdg_variable_or_prefix("XDG_DATA_HOME", "share"));
 
 static XDG_BIN_HOME: LazyLock<Option<Box<HostPath>>> =
-    LazyLock::new(|| parse_xdg_variable("XDG_BIN_HOME", concat!(PREFIX, MAIN_SEPARATOR, "bin")));
+    LazyLock::new(|| parse_xdg_variable_or_prefix("XDG_BIN_HOME", "bin"));
 
-static XDG_INCLUDE_HOME: LazyLock<Option<Box<HostPath>>> = LazyLock::new(|| {
-    parse_xdg_variable(
-        "XDG_INCLUDE_HOME",
-        concat!(PREFIX, MAIN_SEPARATOR, "include"),
-    )
-});
+static XDG_INCLUDE_HOME: LazyLock<Option<Box<HostPath>>> =
+    LazyLock::new(|| parse_xdg_variable_or_prefix("XDG_INCLUDE_HOME", "include"));
 
 static XDG_LIB_HOME: LazyLock<Option<Box<HostPath>>> =
-    LazyLock::new(|| parse_xdg_variable("XDG_LIB_HOME", concat!(PREFIX, MAIN_SEPARATOR, "lib")));
+    LazyLock::new(|| parse_xdg_variable_or_prefix("XDG_LIB_HOME", "lib"));
 
-static XDG_STATE_HOME: LazyLock<Option<Box<HostPath>>> = LazyLock::new(|| {
-    parse_xdg_variable("XDG_STATE_HOME", concat!(PREFIX, MAIN_SEPARATOR, "state"))
-});
+static XDG_STATE_HOME: LazyLock<Option<Box<HostPath>>> =
+    LazyLock::new(|| parse_xdg_variable_or_prefix("XDG_STATE_HOME", "state"));
 
 static XDG_RUNTIME_DIR: LazyLock<Option<Box<HostPath>>> = LazyLock::new(|| {
     parse_xdg_variable_or_else("XDG_RUNTIME_DIR", || {
@@ -68,9 +62,23 @@ static XDG_RUNTIME_DIR: LazyLock<Option<Box<HostPath>>> = LazyLock::new(|| {
     })
 });
 
-fn parse_xdg_variable(variable: &'static str, fallback: &'static str) -> Option<Box<HostPath>> {
+fn parse_xdg_variable_or_home(
+    variable: &'static str,
+    fallback: &'static str,
+) -> Option<Box<HostPath>> {
     parse_xdg_variable_or_else(variable, || {
         HOME.as_ref().map(|home| home.with_suffix(fallback))
+    })
+}
+
+fn parse_xdg_variable_or_prefix(
+    variable: &'static str,
+    fallback: &'static str,
+) -> Option<Box<HostPath>> {
+    parse_xdg_variable_or_else(variable, || {
+        XDG_PREFIX_HOME
+            .as_ref()
+            .map(|prefix| prefix.with_suffix(fallback))
     })
 }
 

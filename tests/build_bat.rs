@@ -4,11 +4,13 @@ mod assert;
 
 use assert::ResultExtension as _;
 use assert_cmd::cargo::CommandCargoExt as _;
+use bstr::ByteSlice;
 use fs_err as fs;
 use fs_err::create_dir_all;
 use std::env;
 use std::path::Path;
 use std::process::Command;
+use std::process::Output;
 use tap::Pipe as _;
 
 #[test]
@@ -25,32 +27,40 @@ fn build_bat() {
 
     Command::cargo_bin("package-manager")
         .unwrap()
-        .args(["update", "--manifest", "manifest.toml"])
+        .args(["update", "--manifest", "manifest.toml", "--root"])
+        .arg(&root)
         .env_clear()
         .current_dir(&root)
-        .envs([
-            ("HOME", root.join("home")),
-            ("XDG_BIN_HOME", root.join("executables")),
-            ("XDG_CACHE_HOME", root.join("cache")),
-            ("XDG_CONFIG_HOME", root.join("configuration")),
-            ("XDG_DATA_HOME", root.join("data")),
-            ("XDG_INCLUDE_HOME", root.join("headers")),
-            ("XDG_LIB_HOME", root.join("libraries")),
-            ("XDG_STATE_HOME", root.join("state")),
-            ("XDG_RUNTIME_DIR", root.join("run")),
-        ])
+        .envs([("HOME", root.join("home"))])
         // TODO: Figure out what to do with this.
         .env("PATH", env!("PATH"))
         .envs(
             [
                 env::var_os("RUST_BACKTRACE").map(|value| ("RUST_BACKTRACE", value)),
                 env::var_os("RUST_LIB_BACKTRACE").map(|value| ("RUST_LIB_BACKTRACE", value)),
+                env::var_os("RUST_LOG").map(|value| ("RUST_LOG", value)),
             ]
             .into_iter()
             .flatten(),
         )
-        .status()
+        .output()
         .assert_ok()
-        .success()
-        .pipe(|success| assert!(success));
+        .pipe(
+            |Output {
+                 status,
+                 stdout,
+                 stderr,
+             }| {
+                assert!(status.success());
+
+                assert!(stdout.is_empty(), "{}", String::from_utf8_lossy(&stdout));
+
+                // TODO: Disallow warnings too.
+                assert!(
+                    !stderr.contains_str("ERROR"),
+                    "{}",
+                    String::from_utf8_lossy(&stderr)
+                );
+            },
+        );
 }

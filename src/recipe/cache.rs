@@ -12,6 +12,7 @@ use gix::Repository;
 use rapidhash::v3::rapidhash_v3;
 use std::io;
 use std::path::Path;
+use tracing::debug;
 use tracing::info;
 use tracing::warn;
 use url::Url;
@@ -25,6 +26,8 @@ pub(crate) fn find_cached_download_lock_or_create(
         hash((recipe.version(), recipe.download_data())),
         recipe.name()
     ));
+
+    debug!("path for the download lock for {recipe}: {path}");
 
     Ok(if path.exists() {
         info!("using the cached lock");
