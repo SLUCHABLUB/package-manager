@@ -9,6 +9,28 @@ use std::ops::Deref;
 use std::path::MAIN_SEPARATOR_STR;
 use std::path::Path;
 
+macro_rules! join_path {
+    ($($segment:expr),* $(,)?) => {
+        ::const_str::join!(
+            &[$($segment),*],
+            ::std::path::MAIN_SEPARATOR_STR
+        )
+    };
+}
+
+pub(crate) use join_path;
+
+macro_rules! join_namespaced_path {
+    ($($segment:expr),* $(,)?) => {
+        $crate::path::join_path!(
+            $crate::PACKAGE_NAME,
+            $($segment),*
+        )
+    };
+}
+
+pub(crate) use join_namespaced_path;
+
 #[derive(Eq, PartialEq, Hash, Debug, Serialize)]
 #[repr(transparent)]
 struct AbsolutePath(Path);

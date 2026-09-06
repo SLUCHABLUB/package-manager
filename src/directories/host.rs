@@ -2,9 +2,8 @@ use crate::HostPath;
 use crate::PACKAGE_NAME;
 use crate::TargetDirectories;
 use crate::directories::XDG_CACHE_HOME;
+use crate::path::join_namespaced_path;
 use anyhow::Context;
-use const_str::join;
-use std::path;
 
 // TODO: Make this opaque.
 #[derive(Debug)]
@@ -48,32 +47,16 @@ impl HostDirectories {
         let data_directory = target.data().with_root(&installation_root);
 
         Some(HostDirectories {
-            download_locks: cache_directory.with_suffix(join!(
-                &[PACKAGE_NAME, "download-locks"],
-                path::MAIN_SEPARATOR_STR
-            )),
-            repositories: cache_directory.with_suffix(join!(
-                &[PACKAGE_NAME, "repositories"],
-                path::MAIN_SEPARATOR_STR
-            )),
-            sources: cache_directory
-                .with_suffix(join!(&[PACKAGE_NAME, "sources"], path::MAIN_SEPARATOR_STR)),
-            working: cache_directory
-                .with_suffix(join!(&[PACKAGE_NAME, "build"], path::MAIN_SEPARATOR_STR)),
+            download_locks: cache_directory.with_suffix(join_namespaced_path!("download-locks")),
+            repositories: cache_directory.with_suffix(join_namespaced_path!("repositories")),
+            sources: cache_directory.with_suffix(join_namespaced_path!("sources")),
+            working: cache_directory.with_suffix(join_namespaced_path!("build")),
 
-            images: cache_directory
-                .with_suffix(join!(&[PACKAGE_NAME, "images"], path::MAIN_SEPARATOR_STR)),
+            images: cache_directory.with_suffix(join_namespaced_path!("images")),
 
-            staging: data_directory
-                .with_suffix(join!(&[PACKAGE_NAME, "staging"], path::MAIN_SEPARATOR_STR)),
-            lock_file: data_directory.with_suffix(join!(
-                &[PACKAGE_NAME, "install-lock.toml"],
-                path::MAIN_SEPARATOR_STR
-            )),
-            journal_file: data_directory.with_suffix(join!(
-                &[PACKAGE_NAME, "install-journal.toml"],
-                path::MAIN_SEPARATOR_STR
-            )),
+            staging: data_directory.with_suffix(join_namespaced_path!("staging")),
+            lock_file: data_directory.with_suffix(join_namespaced_path!("install-lock.toml")),
+            journal_file: data_directory.with_suffix(join_namespaced_path!("install-journal.toml")),
             journal_directory: data_directory.with_suffix(PACKAGE_NAME),
 
             installation_root,
