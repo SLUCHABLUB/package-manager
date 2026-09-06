@@ -1,19 +1,21 @@
 use crate::HostPath;
 use crate::LockPlan;
 use crate::Recipe;
-use crate::ResultExtension as _;
 use crate::TargetDirectories;
 use crate::VersionRequirement;
 use crate::recipe_store::RecipeStore;
+use crate::result::convert_result;
 use anyhow::Context;
+use anyhow::ensure;
+use fs_err::DirEntry;
 use fs_err::read_dir;
 use fs_err::read_to_string;
+use itertools::Itertools as _;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::path::Path;
-use tracing::warn;
 
 #[derive(Debug)]
 pub(crate) struct Manifest {
@@ -49,35 +51,24 @@ impl Manifest {
         })
     }
 
-    fn read_recipes(&self) -> impl Iterator<Item = Recipe> {
+    fn read_recipes(&self) -> impl Iterator<Item = anyhow::Result<Recipe>> {
         self.data
             .recipe_directories
             .iter()
-            .filter_map(|directory| {
-                Some(
-                    read_dir(self.parent_directory.join(directory))
-                        .ok_or_log()?
-                        .filter_map(|entry| {
-                            let entry = entry.ok_or_log()?;
-                            let path = entry.path();
-
-                            let path = HostPath::new(&path)
-                                .expect("readdir output should be absolute for absolute input");
-
-                            if entry.file_type().ok_or_log()?.is_dir() {
-                                warn!("skipping the directory `{path}`");
-                                return None;
-                            }
-
-                            Recipe::read_from(path).ok_or_log()
-                        }),
-                )
-            })
-            .flatten()
+            .map(|relative| self.resolve_relative_path(relative))
+            .map(read_recipes_from_directory)
+            .flatten_ok()
+            .map(Result::flatten)
     }
 
-    pub(crate) fn create_recipe_store(&self) -> RecipeStore {
-        RecipeStore::from_recipes(self.read_recipes())
+    fn resolve_relative_path(&self, path: &Path) -> Box<HostPath> {
+        self.parent_directory.with_suffix(path)
+    }
+
+    pub(crate) fn create_recipe_store(&self) -> anyhow::Result<RecipeStore> {
+        let recipes = self.read_recipes().collect::<anyhow::Result<_>>()?;
+
+        Ok(RecipeStore::from_recipes(recipes))
     }
 
     pub(crate) fn packages(&self) -> impl Iterator<Item = (&str, &VersionRequirement)> {
@@ -105,6 +96,26 @@ impl Manifest {
             InstallLocation::User => TargetDirectories::user(),
         }
     }
+}
+
+#[expect(clippy::needless_pass_by_value, clippy::boxed_local)]
+fn read_recipes_from_directory(
+    directory: Box<HostPath>,
+) -> anyhow::Result<impl Iterator<Item = anyhow::Result<Recipe>> + use<>> {
+    Ok(read_dir(&*directory)?
+        .map(convert_result)
+        .map_ok(read_recipe_from_directory_entry)
+        .map(Result::flatten))
+}
+
+#[expect(clippy::needless_pass_by_value)]
+fn read_recipe_from_directory_entry(entry: DirEntry) -> anyhow::Result<Recipe> {
+    let path = entry.path();
+    let path = HostPath::new(&path).expect("readdir output should be absolute for absolute input");
+
+    ensure!(!path.is_dir(), "expected a file, found a directory: {path}");
+
+    Recipe::read_from(path)
 }
 
 impl Display for Manifest {

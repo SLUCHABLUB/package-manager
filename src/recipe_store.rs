@@ -8,10 +8,8 @@ pub struct RecipeStore {
 }
 
 impl RecipeStore {
-    pub(crate) fn from_recipes(recipes: impl IntoIterator<Item = Recipe>) -> RecipeStore {
-        RecipeStore {
-            recipes: recipes.into_iter().collect(),
-        }
+    pub(crate) fn from_recipes(recipes: Box<[Recipe]>) -> RecipeStore {
+        RecipeStore { recipes }
     }
 
     #[context("searching for a recipe for the `{name}` package matching version {version}")]

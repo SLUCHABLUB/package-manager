@@ -129,7 +129,7 @@ fn update(manifest_path: Box<HostPath>, installation_root: Box<HostPath>) -> any
 
     let host_directories = HostDirectories::new(&target_directories, installation_root)?;
 
-    let recipes = leak(manifest.create_recipe_store());
+    let recipes = leak(manifest.create_recipe_store()?);
 
     let lock_plan = manifest.lock_plan(recipes)?;
     let hash_plan = lock_plan.lock(&host_directories)?;

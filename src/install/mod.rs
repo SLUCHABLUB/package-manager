@@ -9,6 +9,7 @@ use crate::TargetDirectories;
 use crate::TargetPath;
 use crate::install::lock::lock;
 use crate::install::lock::unlock;
+use crate::result::convert_result;
 use anyhow::Context as _;
 use anyhow::bail;
 use const_str::concat;
@@ -218,7 +219,7 @@ impl Journal {
     }
 
     fn serialise(&self) -> anyhow::Result<impl AsRef<[u8]> + use<>> {
-        toml::to_string(&self).map_err(anyhow::Error::from)
+        convert_result(toml::to_string(&self))
     }
 
     #[context("removing the journal")]

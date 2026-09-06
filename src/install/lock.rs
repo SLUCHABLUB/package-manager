@@ -1,5 +1,6 @@
 use crate::HostDirectories;
 use crate::ResultExtension;
+use crate::result::convert_result;
 use fn_error_context::context;
 use fs_err::File;
 use serde::Deserialize;
@@ -80,7 +81,7 @@ impl LockFile {
     }
 
     fn serialise(&self) -> anyhow::Result<impl AsRef<[u8]> + use<>> {
-        toml::to_string(&self).map_err(anyhow::Error::from)
+        convert_result(toml::to_string(&self))
     }
 
     fn read_from_file(file: &File) -> anyhow::Result<LockFile> {

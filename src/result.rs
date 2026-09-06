@@ -26,6 +26,13 @@ where
     }
 }
 
+pub(crate) fn convert_result<T, E>(result: Result<T, E>) -> anyhow::Result<T>
+where
+    E: Into<anyhow::Error> + 'static,
+{
+    result.map_err(E::into)
+}
+
 #[inline]
 pub(crate) fn log_error(error: impl Into<anyhow::Error> + 'static) {
     log_anyhow_error(&error.into());
