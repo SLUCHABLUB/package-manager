@@ -1,3 +1,5 @@
+mod lock;
+
 use crate::HostDirectories;
 use crate::HostPath;
 use crate::PACKAGE_NAME;
@@ -5,6 +7,8 @@ use crate::ResultExtension;
 use crate::SystemLedger;
 use crate::TargetDirectories;
 use crate::TargetPath;
+use crate::install::lock::lock;
+use crate::install::lock::unlock;
 use anyhow::Context as _;
 use anyhow::bail;
 use const_str::concat;
@@ -14,15 +18,8 @@ use fs_err::File;
 use fs_err::create_dir_all;
 use fs_err::remove_file;
 use rapidhash::v3::rapidhash_v3_file;
-use serde::Deserialize;
 use serde::Serialize;
-use show_option::ShowOption;
-use std::fs::TryLockError;
-use std::io::Read;
-use std::io::Seek;
-use std::io::SeekFrom;
 use std::io::Write;
-use std::process;
 use tracing::info;
 use tracing::warn;
 
@@ -63,66 +60,6 @@ pub(crate) fn install(
     unlock(lock)?;
 
     info!("cleaning complete; you may touch the file system");
-
-    Ok(())
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct LockFile {
-    process_id: u32,
-}
-
-#[context("acquiring the file system lock")]
-fn lock(directories: &HostDirectories) -> anyhow::Result<File> {
-    let my_lock = LockFile {
-        process_id: process::id(),
-    };
-    let my_lock = toml::to_string(&my_lock)?;
-
-    let mut file = File::options()
-        .create(true)
-        .read(true)
-        .write(true)
-        .open(&*directories.lock_file)?;
-
-    match file.try_lock() {
-        Ok(()) => (),
-        Err(TryLockError::WouldBlock) => {
-            // We have try-blocks at home.
-            let their_pid = (|| -> anyhow::Result<u32> {
-                let mut buffer = String::new();
-                file.read_to_string(&mut buffer)?;
-
-                let their_lock = toml::from_str::<LockFile>(&buffer)?;
-                Ok(their_lock.process_id)
-            })()
-            .ok();
-
-            warn!(
-                "waiting for the file system lock (held by {})",
-                their_pid.show_prefixed_or("the process with id ", "some unknown process")
-            );
-            file.lock()?;
-        }
-        Err(TryLockError::Error(error)) => return Err(error.into()),
-    }
-
-    // We need to reset the cursor since it might have been moved by a read.
-    file.set_len(0)?;
-    file.seek(SeekFrom::Start(0))?;
-
-    file.write_all(my_lock.as_bytes())?;
-
-    Ok(file)
-}
-
-#[context("releasing the file system lock")]
-fn unlock(file: File) -> anyhow::Result<()> {
-    file.set_len(0)?;
-
-    file.unlock()?;
-
-    drop(file);
 
     Ok(())
 }
