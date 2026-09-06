@@ -1,3 +1,8 @@
+#![expect(
+    clippy::non_std_lazy_statics,
+    reason = "the try api in std is unstable"
+)]
+
 mod host;
 mod target;
 
