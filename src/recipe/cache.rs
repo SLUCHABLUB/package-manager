@@ -27,7 +27,7 @@ pub(crate) fn find_cached_download_lock_or_create(
         recipe.name()
     ));
 
-    debug!("path for the download lock for {recipe}: {path}");
+    debug!("the path for the download lock for {recipe} is {path}");
 
     Ok(if path.exists() {
         info!("using the cached lock");
@@ -144,6 +144,8 @@ impl Image {
     ) -> anyhow::Result<Result<Image, Box<HostPath>>> {
         // TODO: Base this on the recipe hash.
         let path = host.images.with_suffix(recipe.name());
+
+        debug!("the image path for {recipe} is {path}");
 
         Ok(if is_directory_populated(&path)? {
             info!("using the cached package image");

@@ -3,6 +3,7 @@ pub(crate) trait ResultExtension {
     type T;
     type E;
 
+    #[track_caller]
     fn assert_ok(self) -> Self::T;
 }
 
@@ -13,6 +14,7 @@ where
     type T = T;
     type E = E;
 
+    #[track_caller]
     fn assert_ok(self) -> T {
         match self {
             Ok(ok) => ok,

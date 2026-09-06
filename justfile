@@ -1,19 +1,10 @@
 set ignore-comments
 
-offline-clean-tests:
-    rm -rf target/tmp/build-bat-root/cache/build
-    rm -rf target/tmp/build-bat-root/cache/images
+clean-tests:
+    rm -rf target/tmp/build_bat
 
-    @just clean-test-installation
-
-clean-test-installation:
-    rm -rf target/tmp/build-bat-root/home/.local
-    rm -rf target/tmp/build-bat-root/configuration
-    rm -rf target/tmp/build-bat-root/data
-    rm -rf target/tmp/build-bat-root/executables
-    rm -rf target/tmp/build-bat-root/headers
-    rm -rf target/tmp/build-bat-root/libraries
-    rm -rf target/tmp/build-bat-root/state
+initialise-rustup:
+    HOME='{{ justfile_directory() }}/target/tmp/build_bat/home' rustup default stable
 
 cross-check:
     # TODO: Test the ones with no docker images.
