@@ -129,7 +129,6 @@ fn update(manifest_path: Box<HostPath>, installation_root: Box<HostPath>) -> any
 
     let host_directories = HostDirectories::new(&target_directories, installation_root)?;
 
-    let _old_ledger = SystemLedger::read_from_host(&target_directories, &host_directories)?;
     let recipes = leak(manifest.create_recipe_store());
 
     let lock_plan = manifest.lock_plan(recipes)?;

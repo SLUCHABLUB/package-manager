@@ -37,114 +37,29 @@ pub(crate) fn install(
 ) -> anyhow::Result<()> {
     let lock = lock(host)?;
 
-    warn!("installing... don't touch the file system please");
-
-    // TODO: Try recover (if the journal exists).
-
     let old_ledger = SystemLedger::read_from_host(target, host)?;
 
-    let mut journal = Journal::new();
+    warn!("installing... don't touch the file system please");
 
-    for (recipe, file, hash) in ledger.files() {
-        match check_conflict(file, hash, &old_ledger, &host.installation_root)? {
-            ConflictCheckResult::New => {
-                journal.operations.push(InstallOperation {
-                    file: Box::from(file),
-                    temporary: file.with_extension(TEMPORARY_EXTENSION),
-                    backup: None,
-                });
-            }
-            ConflictCheckResult::Updated => {
-                journal.operations.push(InstallOperation {
-                    file: Box::from(file),
-                    temporary: file.with_extension(TEMPORARY_EXTENSION),
-                    backup: Some(file.with_extension(BACKUP_EXTENSION)),
-                });
-            }
-            ConflictCheckResult::Unmanaged => {
-                // TODO: We could prompt the user here.
-                bail!(
-                    "the installation of the `{recipe}` recipe would override the unmanaged file at `{file}`"
-                );
-            }
-            ConflictCheckResult::Modified => {
-                // TODO: We could prompt the user here.
-                bail!("the file at `{file}` has been modified since the last installation");
-            }
-            ConflictCheckResult::RemainsSame => {
-                // No update needed.
-            }
-        }
-    }
+    let mut journal = Journal::from_ledgers(ledger, &old_ledger, host)?;
 
-    journal
-        .operations
-        .push(ledger_install(&ledger, &host.installation_root));
+    journal.write_to_system()?;
 
-    drop(ledger);
+    // TODO: Henceforth, if we fail, we can try to recover using the journal.
 
-    let journal = journal;
+    create_temporary_files(&journal, host)?;
 
-    let serialised_journal = toml::to_string(&journal)?;
+    create_backups(&journal, host)?;
 
-    let journal_directory = File::open(&*host.journal_directory)?;
-    let mut journal_file = File::create_new(&*host.journal_file)?;
-
-    // TODO: Don't use the try operator beyond this point until we've removed the journal.
-
-    journal_file.write_all(serialised_journal.as_bytes())?;
-
-    journal_file.sync_all()?;
-    journal_directory.sync_all()?;
-
-    for operation in &journal.operations {
-        let staged = operation.file.with_root(&host.staging);
-        let destination = operation.temporary.with_root(&host.installation_root);
-
-        if let Some(parent) = destination.parent() {
-            // TODO: Handle directory permissions.
-            create_dir_all(parent)?;
-        }
-
-        fs::copy(staged, destination)?;
-    }
-
-    for operation in &journal.operations {
-        let old = operation.file.with_root(&host.installation_root);
-        let destination = match &operation.backup {
-            Some(path) => path.with_root(&host.installation_root),
-            None => continue,
-        };
-
-        fs::copy(old, destination)?;
-    }
-
-    for operation in &journal.operations {
-        let temporary = operation.temporary.with_root(&host.installation_root);
-        let destination = operation.file.with_root(&host.installation_root);
-
-        // TODO: Specialise on linux et al. to use rename2e when there is no backup.
-        fs::rename(temporary, destination)?;
-    }
+    switch_to_temporary_files(&journal, host)?;
 
     info!("installation complete; cleaning up");
 
-    drop(journal_file);
-    remove_file(&*host.journal_file)?;
+    let install_operations = journal.remove_from_system(host)?;
 
-    journal_directory.sync_all()?;
-    drop(journal_directory);
+    remove_backups(&install_operations, host);
 
-    for operation in &journal.operations {
-        let backup = match &operation.backup {
-            Some(path) => path.with_root(&host.installation_root),
-            None => continue,
-        };
-
-        remove_file(backup).context("removing backups").ok_or_log();
-    }
-
-    // If this fails, the kernel will release the lock.
+    // If this fails, the kernel will release the lock anyway.
     unlock(lock)?;
 
     info!("cleaning complete; you may touch the file system");
@@ -255,6 +170,42 @@ fn check_conflict(
     })
 }
 
+fn handle_conflict(
+    conflict: &ConflictCheckResult,
+    file: &TargetPath,
+    journal: &mut Journal,
+) -> anyhow::Result<()> {
+    match conflict {
+        ConflictCheckResult::New => {
+            journal.operations.push(InstallOperation {
+                file: Box::from(file),
+                temporary: file.with_extension(TEMPORARY_EXTENSION),
+                backup: None,
+            });
+        }
+        ConflictCheckResult::Updated => {
+            journal.operations.push(InstallOperation {
+                file: Box::from(file),
+                temporary: file.with_extension(TEMPORARY_EXTENSION),
+                backup: Some(file.with_extension(BACKUP_EXTENSION)),
+            });
+        }
+        ConflictCheckResult::Unmanaged => {
+            // TODO: We could prompt the user here.
+            bail!("the unmanaged file at `{file}` would be overwritten");
+        }
+        ConflictCheckResult::Modified => {
+            // TODO: We could prompt the user here.
+            bail!("the file at `{file}` has been modified since the last installation");
+        }
+        ConflictCheckResult::RemainsSame => {
+            // No update needed.
+        }
+    }
+
+    Ok(())
+}
+
 fn ledger_install(ledger: &SystemLedger, root: &HostPath) -> InstallOperation {
     let should_backup = ledger.path().with_root(root).exists();
 
@@ -265,14 +216,144 @@ fn ledger_install(ledger: &SystemLedger, root: &HostPath) -> InstallOperation {
     }
 }
 
-#[derive(Default, Serialize)]
+#[derive(Serialize)]
 struct Journal {
     operations: Vec<InstallOperation>,
+
+    // These are here to keep the files open until we destroy the journal.
+    #[serde(skip_serializing)]
+    file: File,
+    #[serde(skip_serializing)]
+    directory: File,
 }
 
 impl Journal {
-    fn new() -> Self {
-        Self::default()
+    fn open(host: &HostDirectories) -> anyhow::Result<Journal> {
+        // TODO: Handle the case where the file exists (recover the installation).
+
+        let directory = File::open(&*host.journal_directory)?;
+        let file = File::create_new(&*host.journal_file)?;
+
+        Ok(Journal {
+            operations: Vec::new(),
+            file,
+            directory,
+        })
+    }
+
+    fn from_ledgers(
+        ledger: SystemLedger,
+        old_ledger: &SystemLedger,
+        host: &HostDirectories,
+    ) -> anyhow::Result<Self> {
+        // TODO: Handle the case where the file exists (recover the installation).
+
+        let mut journal = Journal::open(host)?;
+
+        for (recipe, file, hash) in ledger.files() {
+            let conflict = check_conflict(file, hash, old_ledger, &host.installation_root)?;
+            handle_conflict(&conflict, file, &mut journal)
+                .with_context(|| format!("conflict when installing {recipe}"))?;
+        }
+
+        journal
+            .operations
+            .push(ledger_install(&ledger, &host.installation_root));
+
+        drop(ledger);
+
+        Ok(journal)
+    }
+
+    fn write_to_system(&mut self) -> anyhow::Result<()> {
+        let serialised_journal = self.serialise()?;
+
+        self.file.write_all(serialised_journal.as_ref())?;
+
+        // If we cannot ensure that the journal is on the system,
+        // bailing is the best option.
+        self.file.sync_all()?;
+
+        // We need to sync the directory as well so the directory entries are updated.
+        self.directory.sync_all()?;
+
+        Ok(())
+    }
+
+    fn serialise(&self) -> anyhow::Result<impl AsRef<[u8]> + use<>> {
+        toml::to_string(&self).map_err(anyhow::Error::from)
+    }
+
+    #[context("removing the journal")]
+    fn remove_from_system(self, host: &HostDirectories) -> anyhow::Result<Vec<InstallOperation>> {
+        // Close the file.
+        drop(self.file);
+
+        remove_file(&*host.journal_file)?;
+
+        // Update the directory entries so the removal is synced.
+        self.directory.sync_all()?;
+
+        // Close the directory.
+        drop(self.directory);
+
+        Ok(self.operations)
+    }
+}
+
+fn create_temporary_files(journal: &Journal, host: &HostDirectories) -> anyhow::Result<()> {
+    for operation in &journal.operations {
+        let staged = operation.file.with_root(&host.staging);
+        let destination = operation.temporary.with_root(&host.installation_root);
+
+        if let Some(parent) = destination.parent() {
+            // TODO: Handle directory permissions.
+            create_dir_all(parent)?;
+        }
+
+        fs::copy(staged, destination)?;
+    }
+
+    Ok(())
+}
+
+fn create_backups(journal: &Journal, host: &HostDirectories) -> anyhow::Result<()> {
+    for operation in &journal.operations {
+        let old = operation.file.with_root(&host.installation_root);
+        let destination = match &operation.backup {
+            Some(path) => path.with_root(&host.installation_root),
+            None => continue,
+        };
+
+        fs::copy(old, destination)?;
+    }
+
+    Ok(())
+}
+
+/// Moves the temporary files into their final install locations.
+fn switch_to_temporary_files(journal: &Journal, host: &HostDirectories) -> anyhow::Result<()> {
+    for operation in &journal.operations {
+        let temporary = operation.temporary.with_root(&host.installation_root);
+        let destination = operation.file.with_root(&host.installation_root);
+
+        // TODO: Specialise on linux et al. to use rename2e when there is no backup.
+        fs::rename(temporary, destination)?;
+    }
+
+    Ok(())
+}
+
+fn remove_backups(operations: &[InstallOperation], host: &HostDirectories) {
+    for operation in operations {
+        let backup = match &operation.backup {
+            Some(path) => path.with_root(&host.installation_root),
+            None => continue,
+        };
+
+        remove_file(backup)
+            .context("removing backup files")
+            .ok_or_log();
     }
 }
 
