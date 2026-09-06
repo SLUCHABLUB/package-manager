@@ -87,7 +87,7 @@ impl Manifest {
             .map(|(package, version)| (&**package, version))
     }
 
-    pub(crate) fn update(&self, recipes: &'static RecipeStore) -> anyhow::Result<LockPlan> {
+    pub(crate) fn lock_plan(&self, recipes: &'static RecipeStore) -> anyhow::Result<LockPlan> {
         let mut plan = LockPlan::new();
 
         for (name, version) in self.packages() {

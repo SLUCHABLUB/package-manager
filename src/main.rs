@@ -51,60 +51,44 @@ pub(crate) use version::SemanticVersion;
 pub(crate) use version::Version;
 pub(crate) use version::VersionRequirement;
 
+use crate::result::log_error;
 use anyhow::anyhow;
 use arguments::Action;
 use arguments::Arguments;
 use clap::Parser as _;
 use std::io::stderr;
+use std::process::ExitCode;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
 pub(crate) const PACKAGE_NAME: &str = env!("CARGO_PKG_NAME");
 
-fn main() {
-    let arguments = Arguments::parse();
-
-    try_main(arguments).ok_or_log();
+fn main() -> ExitCode {
+    match try_main() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            log_error(error);
+            ExitCode::FAILURE
+        }
+    }
 }
 
-fn try_main(arguments: Arguments) -> anyhow::Result<()> {
-    let filter = EnvFilter::builder()
-        .with_default_directive(LevelFilter::INFO.into())
-        .from_env()?;
+fn try_main() -> anyhow::Result<()> {
+    let arguments = Arguments::try_parse()?;
 
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_writer(stderr)
-        .try_init()
-        .map_err(anyhow::Error::from_boxed)?;
+    set_up_tracing()?;
 
-    // Use a pure rust cryptography provider for rustls to avoid a C-compiler build dependency.
-    rustls_rustcrypto::provider()
-        .install_default()
-        .map_err(|_provider| anyhow!("failed to set the rustls cryptography provider"))?;
+    install_cryptography()?;
 
     match arguments.action {
-        Action::Update { manifest, root } => {
-            let manifest = HostPath::from_cwd_relative(&manifest)?;
-            let manifest = Manifest::read_from(manifest)?;
+        Action::Update {
+            manifest: relative_manifest_path,
+            root,
+        } => {
+            let absolute_manifest_path = HostPath::from_cwd_relative(&relative_manifest_path)?;
+            let root = HostPath::from_cwd_relative(&root)?;
 
-            let target_directories = manifest.target_directories()?;
-
-            let installation_root = HostPath::from_cwd_relative(&root)?;
-            let host_directories = HostDirectories::new(&target_directories, installation_root)?;
-
-            let _old_ledger = SystemLedger::read_from_host(&target_directories, &host_directories)?;
-            let recipes = leak(manifest.create_recipe_store());
-
-            let lock_plan = manifest.update(recipes)?;
-            let hash_plan = lock_plan.lock(&host_directories)?;
-            let download_plan = hash_plan.hash();
-            let build_plan = download_plan.download(&host_directories)?;
-            let check_plan = build_plan.build(&target_directories, &host_directories)?;
-            let stage_plan = check_plan.check()?;
-            let new_ledger = stage_plan.stage(&host_directories, &target_directories)?;
-
-            install(new_ledger, &host_directories, &target_directories)?;
+            update(absolute_manifest_path, root)?;
         }
     }
 
@@ -115,4 +99,48 @@ fn try_main(arguments: Arguments) -> anyhow::Result<()> {
 // leaking some things in main is fine and just makes some types nicer.
 fn leak<T: 'static>(thing: T) -> &'static T {
     Box::leak(Box::new(thing))
+}
+
+fn set_up_tracing() -> anyhow::Result<()> {
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
+        .from_env()?;
+
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_writer(stderr)
+        .try_init()
+        .map_err(anyhow::Error::from_boxed)?;
+
+    Ok(())
+}
+
+fn install_cryptography() -> anyhow::Result<()> {
+    // Use a pure rust cryptography provider for rustls to avoid a C-compiler build dependency.
+    rustls_rustcrypto::provider()
+        .install_default()
+        .map_err(|_provider| anyhow!("failed to set the rustls cryptography provider"))
+}
+
+fn update(manifest_path: Box<HostPath>, installation_root: Box<HostPath>) -> anyhow::Result<()> {
+    let manifest = Manifest::read_from(manifest_path)?;
+
+    let target_directories = manifest.target_directories()?;
+
+    let host_directories = HostDirectories::new(&target_directories, installation_root)?;
+
+    let _old_ledger = SystemLedger::read_from_host(&target_directories, &host_directories)?;
+    let recipes = leak(manifest.create_recipe_store());
+
+    let lock_plan = manifest.lock_plan(recipes)?;
+    let hash_plan = lock_plan.lock(&host_directories)?;
+    let download_plan = hash_plan.hash();
+    let build_plan = download_plan.download(&host_directories)?;
+    let check_plan = build_plan.build(&target_directories, &host_directories)?;
+    let stage_plan = check_plan.check()?;
+    let new_ledger = stage_plan.stage(&host_directories, &target_directories)?;
+
+    install(new_ledger, &host_directories, &target_directories)?;
+
+    Ok(())
 }

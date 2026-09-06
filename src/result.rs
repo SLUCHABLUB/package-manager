@@ -1,6 +1,6 @@
-use once_cell::race::OnceBool;
 use std::env;
 use std::ffi::OsStr;
+use std::sync::LazyLock;
 use tracing::error;
 
 pub(crate) trait ResultExtension {
@@ -16,28 +16,37 @@ where
     type T = T;
 
     fn ok_or_log(self) -> Option<T> {
-        static BACKTRACE: OnceBool = OnceBool::new();
-
-        let backtrace = BACKTRACE.get_or_init(|| match env::var_os("RUST_LIB_BACKTRACE") {
-            Some(string) if string == OsStr::new("0") => false,
-            Some(_) => true,
-            None => match env::var_os("RUST_BACKTRACE") {
-                Some(string) if string == OsStr::new("0") => false,
-                Some(_) => true,
-                None => false,
-            },
-        });
-
         match self {
             Ok(value) => Some(value),
-            Err(error) if backtrace => {
-                error!("{:?}", error.into());
-                None
-            }
             Err(error) => {
-                error!("{:#}", error.into());
+                log_error(error);
                 None
             }
         }
+    }
+}
+
+#[inline]
+pub(crate) fn log_error(error: impl Into<anyhow::Error> + 'static) {
+    log_anyhow_error(&error.into());
+}
+
+static BACKTRACE_ENABLED: LazyLock<bool> = LazyLock::new(|| {
+    let disabled = OsStr::new("0");
+
+    if let Some(rust_lib_backtrace) = env::var_os("RUST_LIB_BACKTRACE") {
+        rust_lib_backtrace != disabled
+    } else if let Some(rust_backtrace) = env::var_os("RUST_BACKTRACE") {
+        rust_backtrace != disabled
+    } else {
+        false
+    }
+});
+
+fn log_anyhow_error(error: &anyhow::Error) {
+    if *BACKTRACE_ENABLED {
+        error!("{error:?}");
+    } else {
+        error!("{error:#}");
     }
 }

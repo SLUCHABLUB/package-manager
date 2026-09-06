@@ -2,17 +2,17 @@
 
 mod assert;
 
+use crate::assert::assert_no_error_logs;
+use crate::assert::assert_no_stdout;
+use crate::assert::assert_success;
 use assert::ResultExtension as _;
 use assert_cmd::cargo::CommandCargoExt as _;
-use bstr::ByteSlice;
 use fs_err::create_dir_all;
 use std::env;
 use std::io;
 use std::os::unix;
 use std::path::Path;
 use std::process::Command;
-use std::process::Output;
-use tap::Pipe as _;
 
 fn symlink(original: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
     // Symlinks are freaky on some weird OSes.
@@ -42,7 +42,7 @@ fn build_bat() {
         symlink(assets.join("recipes"), test_directory.join("recipes")).assert_ok();
     }
 
-    let mut command = Command::cargo_bin("package-manager").unwrap();
+    let mut command = Command::cargo_bin("package-manager").assert_ok();
 
     command.arg("update");
 
@@ -53,7 +53,11 @@ fn build_bat() {
 
     set_environment(&mut command, &test_directory);
 
-    command.output().assert_ok().pipe(check_output);
+    let output = command.output().assert_ok();
+
+    assert_success(&output);
+    assert_no_error_logs(&output);
+    assert_no_stdout(&output);
 }
 
 fn set_environment(command: &mut Command, test_directory: &Path) {
@@ -73,23 +77,4 @@ fn propagate_env_var(variable: &str, command: &mut Command) {
     if let Some(value) = env::var_os(variable) {
         command.env(variable, value);
     }
-}
-
-fn check_output(output: Output) {
-    let Output {
-        status,
-        stdout,
-        stderr,
-    } = output;
-
-    assert!(status.success());
-
-    assert!(stdout.is_empty(), "{}", String::from_utf8_lossy(&stdout));
-
-    // TODO: Disallow warnings too.
-    assert!(
-        !stderr.contains_str("ERROR"),
-        "{}",
-        String::from_utf8_lossy(&stderr)
-    );
 }
