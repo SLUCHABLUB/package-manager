@@ -4,6 +4,7 @@ use crate::BuildWorkingDirectory;
 use crate::HostDirectories;
 use crate::HostPath;
 use crate::Image;
+use crate::PACKAGE_NAME;
 use crate::Recipe;
 use crate::Source;
 use crate::TargetDirectories;
@@ -12,11 +13,22 @@ use crate::recipe::Build;
 use crate::result::convert_thread_error;
 use anyhow::Context;
 use anyhow::bail;
+use anyhow::ensure;
 use bstr::ByteSlice;
 use derive_more::FromStr;
 use fn_error_context::context;
 use fs_err as fs;
 use fs_err::create_dir_all;
+use landlock::ABI;
+use landlock::Access as _;
+use landlock::AccessFs;
+use landlock::AccessNet;
+use landlock::CompatLevel;
+use landlock::Compatible as _;
+use landlock::LandlockStatus;
+use landlock::Ruleset;
+use landlock::RulesetAttr as _;
+use landlock::RulesetStatus;
 use serde::Deserialize;
 use std::ffi::OsString;
 use std::path::Path;
@@ -210,6 +222,7 @@ fn build_in_sandbox(
     copies: Vec<FileTransfer>,
     sandbox: Sandbox,
 ) -> anyhow::Result<Image> {
+    // TODO: Allow automatic sandbox downgrading.
     match sandbox {
         Sandbox::None => {
             warn!("not sand-boxing the build");
@@ -270,9 +283,73 @@ fn build_landlocked(
     copies: Vec<FileTransfer>,
 ) -> anyhow::Result<Image> {
     thread::spawn(move || {
-        // TODO: Landlock.
+        landlock_current_thread()?;
         build_locally(image, commands, working_directory, copies)
     })
     .join()
     .map_err(convert_thread_error)?
+}
+
+#[context("enabling landlock")]
+fn landlock_current_thread() -> anyhow::Result<()> {
+    // TODO: We could parameterise this.
+    // This should be the latest landlock API.
+    const ABI: ABI = ABI::V9;
+
+    // TODO: Take this a a parameter.
+    let compatibility = CompatLevel::HardRequirement;
+
+    let file_system_access = AccessFs::from_all(ABI);
+    let network_access = AccessNet::from_all(ABI);
+
+    let status = Ruleset::default()
+        .handle_access(file_system_access)?
+        .handle_access(network_access)?
+        .set_compatibility(compatibility)
+        .create()?
+        .restrict_self()?;
+
+    match status.landlock {
+        LandlockStatus::NotEnabled => bail!("landlock is disabled in the kernel"),
+        LandlockStatus::NotImplemented => bail!("landlock is not compiled into the kernel"),
+        LandlockStatus::Available {
+            effective_abi,
+            kernel_abi: None,
+        } => {
+            debug_assert!(effective_abi <= ABI);
+
+            ensure!(
+                effective_abi < ABI,
+                "the kernel doesn't support the latest landlock ABI (version {ABI}), \
+                only version {effective_abi}"
+            );
+        }
+        LandlockStatus::Available {
+            effective_abi,
+            kernel_abi: Some(kernel_abi),
+        } => {
+            debug_assert_eq!(effective_abi, ABI);
+            warn!(
+                "the kernel supports a newer landlock ABI (version {kernel_abi}) \
+                than {PACKAGE_NAME} (which supports version {ABI}), \
+                please file an issue to update {PACKAGE_NAME}"
+            );
+        }
+    }
+
+    match status.ruleset {
+        RulesetStatus::FullyEnforced => info!("landlock fully enabled"),
+        // TODO: Take a parameter to determine if this is an error or warning.
+        RulesetStatus::PartiallyEnforced => bail!("not all rules could be enforced"),
+        RulesetStatus::NotEnforced => bail!("no rules could be enforced"),
+    }
+
+    ensure!(
+        status.no_new_privs,
+        "unable to prevent privilege escalation"
+    );
+
+    debug_assert!(!status.all_threads, "only this thread should be landlocked");
+
+    Ok(())
 }

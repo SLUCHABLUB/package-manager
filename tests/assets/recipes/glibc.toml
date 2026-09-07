@@ -3,7 +3,7 @@ version = "2.43"
 [download]
 
 [download.tarball_index]
-url = "https://ftpmirror.gnu.org/gnu/glibc/"
+url = "https://mirror.accum.se/mirror/gnu.org/gnu/glibc/"
 file_name_prefix = "glibc-"
 
 [build]

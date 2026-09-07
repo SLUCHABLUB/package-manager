@@ -21,6 +21,8 @@ pub(crate) fn find_cached_download_lock_or_create(
     recipe: &Recipe,
     host: &HostDirectories,
 ) -> anyhow::Result<DownloadLock> {
+    create_dir_all(&host.download_locks)?;
+
     let path = host.download_locks.with_suffix(format!(
         "{}-{}.toml",
         hash((recipe.version(), recipe.download_data())),

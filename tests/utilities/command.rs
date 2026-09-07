@@ -9,6 +9,7 @@ use std::io::Read;
 use std::io::Write;
 use std::process::Command;
 use std::process::Output;
+use std::process::Stdio;
 use std::thread;
 use std::thread::JoinHandle;
 
@@ -17,7 +18,11 @@ pub(crate) fn create_command() -> Command {
 }
 
 pub(crate) fn run_command(mut command: Command) -> Output {
-    let mut child = command.spawn().assert_ok();
+    let mut child = command
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .assert_ok();
 
     let child_stderr = child.stderr.take().expect("stderr should exist");
     let child_stdout = child.stdout.take().expect("stdout should exist");

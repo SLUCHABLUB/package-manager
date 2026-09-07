@@ -7,6 +7,7 @@ use crate::utilities::assert::assert_no_error_logs;
 use crate::utilities::assert::assert_no_stdout;
 use crate::utilities::assert::assert_success;
 use crate::utilities::command::create_command;
+use crate::utilities::command::run_command;
 use fs_err::create_dir_all;
 use std::env;
 use std::io;
@@ -56,7 +57,7 @@ fn build_bat() {
 
     set_environment(&mut command, &test_directory);
 
-    let output = command.output().assert_ok();
+    let output = run_command(command);
 
     assert_success(&output);
     assert_no_error_logs(&output);
