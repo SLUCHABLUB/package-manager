@@ -1,12 +1,12 @@
 // TODO: We should set up some better testing fixtures
 
-mod assert;
+mod utilities;
 
-use crate::assert::assert_no_error_logs;
-use crate::assert::assert_no_stdout;
-use crate::assert::assert_success;
-use assert::ResultExtension as _;
-use assert_cmd::cargo::CommandCargoExt as _;
+use crate::utilities::assert::ResultExtension as _;
+use crate::utilities::assert::assert_no_error_logs;
+use crate::utilities::assert::assert_no_stdout;
+use crate::utilities::assert::assert_success;
+use crate::utilities::command::create_command;
 use fs_err::create_dir_all;
 use std::env;
 use std::io;
@@ -42,7 +42,7 @@ fn build_bat() {
         symlink(assets.join("recipes"), test_directory.join("recipes")).assert_ok();
     }
 
-    let mut command = Command::cargo_bin("package-manager").assert_ok();
+    let mut command = create_command();
 
     command.arg("update");
 

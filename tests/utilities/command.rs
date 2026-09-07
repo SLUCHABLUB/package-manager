@@ -3,9 +3,7 @@
     reason = "cargo doesn't see that other modules use this one"
 )]
 
-mod assert;
-
-use crate::assert::ResultExtension;
+use crate::utilities::assert::ResultExtension;
 use std::io;
 use std::io::Read;
 use std::io::Write;
