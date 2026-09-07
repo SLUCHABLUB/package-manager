@@ -1,5 +1,7 @@
+use std::any::Any;
 use std::env;
 use std::ffi::OsStr;
+use std::mem::forget;
 use std::sync::LazyLock;
 use tracing::error;
 
@@ -31,6 +33,26 @@ where
     E: Into<anyhow::Error> + 'static,
 {
     result.map_err(E::into)
+}
+
+pub(crate) fn convert_thread_error(error: Box<dyn Any + Send + 'static>) -> anyhow::Error {
+    let error_message = thread_error_to_error_message(&error);
+    let new_error = anyhow::Error::msg(error_message.to_owned());
+
+    // Dropping this might panic.
+    forget(error);
+
+    new_error
+}
+
+fn thread_error_to_error_message<'error>(error: &'error (dyn Any + Send + 'static)) -> &'error str {
+    if let Some(message) = error.downcast_ref::<&'static str>() {
+        message
+    } else if let Some(message) = error.downcast_ref::<String>() {
+        message
+    } else {
+        "unknown error"
+    }
 }
 
 #[inline]

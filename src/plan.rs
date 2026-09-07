@@ -9,6 +9,7 @@ use crate::SystemLedger;
 use crate::TargetDirectories;
 use crate::VersionRequirement;
 use crate::build;
+use crate::build::Sandbox;
 use crate::check_image;
 use crate::download;
 use crate::find_cached_download_lock_or_create;
@@ -292,6 +293,7 @@ impl DownloadPlan {
 impl BuildPlan {
     pub(crate) fn build(
         self,
+        sandbox: Sandbox,
         target: &TargetDirectories,
         host: &HostDirectories,
     ) -> anyhow::Result<CheckPlan> {
@@ -301,7 +303,7 @@ impl BuildPlan {
 
         // TODO: Parallelise.
         for downloaded in self.recipes {
-            let image = build(downloaded.recipe, downloaded.source, target, host)?;
+            let image = build(downloaded.recipe, downloaded.source, sandbox, target, host)?;
 
             built_recipes.push(BuiltRecipe {
                 recipe: downloaded.recipe,

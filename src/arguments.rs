@@ -1,3 +1,4 @@
+use crate::build::Sandbox;
 use std::path::Path;
 
 #[derive(clap::Parser)]
@@ -14,5 +15,9 @@ pub(crate) enum Action {
         manifest: Box<Path>,
         #[arg(long, default_value = "/")]
         root: Box<Path>,
+
+        // TODO: Move this to the config.
+        #[arg(long, default_value = "none")]
+        sandbox: Sandbox,
     },
 }

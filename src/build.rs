@@ -9,15 +9,19 @@ use crate::Source;
 use crate::TargetDirectories;
 use crate::TargetPath;
 use crate::recipe::Build;
+use crate::result::convert_thread_error;
 use anyhow::Context;
 use anyhow::bail;
 use bstr::ByteSlice;
+use derive_more::FromStr;
 use fn_error_context::context;
 use fs_err as fs;
 use fs_err::create_dir_all;
+use serde::Deserialize;
 use std::ffi::OsString;
 use std::path::Path;
 use std::process::Command;
+use std::thread;
 use tracing::info;
 use tracing::warn;
 
@@ -29,15 +33,19 @@ struct FileTransfer {
     to: Box<TargetPath>,
 }
 
-#[derive(Copy, Clone)]
-enum Sandbox {
+#[derive(Copy, Clone, Deserialize, FromStr)]
+#[serde(rename_all = "snake_case")]
+#[from_str(rename_all = "snake_case")]
+pub(crate) enum Sandbox {
     None,
+    Landlock,
 }
 
 #[context("building {recipe}")]
 pub(crate) fn build(
     recipe: &Recipe,
     source: Source,
+    sandbox: Sandbox,
     target_directories: &TargetDirectories,
     host: &HostDirectories,
 ) -> anyhow::Result<Image> {
@@ -70,8 +78,7 @@ pub(crate) fn build(
         &mut copies,
     );
 
-    // TODO: Take the sandbox as a parameter.
-    let image = build_in_sandbox(image, commands, working_directory, copies, Sandbox::None)?;
+    let image = build_in_sandbox(image, commands, working_directory, copies, sandbox)?;
 
     info!("built {}", recipe.name());
 
@@ -198,18 +205,27 @@ fn flag(name: &str, path: &TargetPath) -> OsString {
 
 fn build_in_sandbox(
     image: Box<HostPath>,
-    mut commands: Vec<Command>,
+    commands: Vec<Command>,
     working_directory: BuildWorkingDirectory,
     copies: Vec<FileTransfer>,
     sandbox: Sandbox,
 ) -> anyhow::Result<Image> {
-    let BuildWorkingDirectory(working_directory) = working_directory;
-
     match sandbox {
-        Sandbox::None => (),
+        Sandbox::None => {
+            warn!("not sand-boxing the build");
+            build_locally(image, commands, working_directory, copies)
+        }
+        Sandbox::Landlock => build_landlocked(image, commands, working_directory, copies),
     }
+}
 
-    warn!("not sand-boxing the build");
+fn build_locally(
+    image: Box<HostPath>,
+    mut commands: Vec<Command>,
+    working_directory: BuildWorkingDirectory,
+    copies: Vec<FileTransfer>,
+) -> anyhow::Result<Image> {
+    let BuildWorkingDirectory(working_directory) = working_directory;
 
     for command in &mut commands {
         command.current_dir(&working_directory);
@@ -245,4 +261,18 @@ fn build_in_sandbox(
     }
 
     Ok(Image(image))
+}
+
+fn build_landlocked(
+    image: Box<HostPath>,
+    commands: Vec<Command>,
+    working_directory: BuildWorkingDirectory,
+    copies: Vec<FileTransfer>,
+) -> anyhow::Result<Image> {
+    thread::spawn(move || {
+        // TODO: Landlock.
+        build_locally(image, commands, working_directory, copies)
+    })
+    .join()
+    .map_err(convert_thread_error)?
 }

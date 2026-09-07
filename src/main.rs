@@ -51,6 +51,7 @@ pub(crate) use version::SemanticVersion;
 pub(crate) use version::Version;
 pub(crate) use version::VersionRequirement;
 
+use crate::build::Sandbox;
 use crate::result::log_error;
 use anyhow::anyhow;
 use arguments::Action;
@@ -84,11 +85,12 @@ fn try_main() -> anyhow::Result<()> {
         Action::Update {
             manifest: relative_manifest_path,
             root,
+            sandbox,
         } => {
             let absolute_manifest_path = HostPath::from_cwd_relative(&relative_manifest_path)?;
             let root = HostPath::from_cwd_relative(&root)?;
 
-            update(absolute_manifest_path, root)?;
+            update(absolute_manifest_path, root, sandbox)?;
         }
     }
 
@@ -122,7 +124,11 @@ fn install_cryptography() -> anyhow::Result<()> {
         .map_err(|_provider| anyhow!("failed to set the rustls cryptography provider"))
 }
 
-fn update(manifest_path: Box<HostPath>, installation_root: Box<HostPath>) -> anyhow::Result<()> {
+fn update(
+    manifest_path: Box<HostPath>,
+    installation_root: Box<HostPath>,
+    sandbox: Sandbox,
+) -> anyhow::Result<()> {
     let manifest = Manifest::read_from(manifest_path)?;
 
     let target_directories = manifest.target_directories()?;
@@ -135,7 +141,7 @@ fn update(manifest_path: Box<HostPath>, installation_root: Box<HostPath>) -> any
     let hash_plan = lock_plan.lock(&host_directories)?;
     let download_plan = hash_plan.hash();
     let build_plan = download_plan.download(&host_directories)?;
-    let check_plan = build_plan.build(&target_directories, &host_directories)?;
+    let check_plan = build_plan.build(sandbox, &target_directories, &host_directories)?;
     let stage_plan = check_plan.check()?;
     let new_ledger = stage_plan.stage(&host_directories, &target_directories)?;
 

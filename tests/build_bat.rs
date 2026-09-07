@@ -49,6 +49,9 @@ fn build_bat() {
     command.args(["--manifest", "manifest.toml"]);
     command.arg("--root").arg(&root);
 
+    // TODO: Don't force landlock here.
+    command.args(["--sandbox", "landlock"]);
+
     command.current_dir(&test_directory);
 
     set_environment(&mut command, &test_directory);
