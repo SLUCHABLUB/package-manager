@@ -2768,6 +2768,7 @@ dependencies = [
  "astral-tl",
  "bstr",
  "by_address",
+ "bytes",
  "clap",
  "const-str",
  "daggy",

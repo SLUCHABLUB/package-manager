@@ -19,6 +19,9 @@ use url::Url;
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Download {
     None,
+    SingleFile {
+        url: Url,
+    },
     Github {
         repository: Box<str>,
     },
@@ -40,6 +43,7 @@ impl Download {
     ) -> anyhow::Result<DownloadLock> {
         Ok(match self {
             Download::None => DownloadLock::None,
+            Download::SingleFile { url } => DownloadLock::SingleFile { url: url.clone() },
             Download::Github { repository } => {
                 let url = format!("https://github.com/{repository}.git");
                 let url = Url::parse(&url)?;
@@ -110,6 +114,9 @@ impl Compression {
 pub(crate) enum DownloadLock {
     #[serde(skip)]
     None,
+    SingleFile {
+        url: Url,
+    },
     Git {
         url: Url,
         commit: ObjectId,

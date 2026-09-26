@@ -67,6 +67,7 @@ impl Source {
     ) -> anyhow::Result<Result<Source, Box<HostPath>>> {
         let path = match download_lock {
             DownloadLock::None => host.sources.with_suffix("none"),
+            DownloadLock::SingleFile { url } => host.sources.with_suffix(encode_url(url)),
             DownloadLock::Git {
                 url,
                 commit,

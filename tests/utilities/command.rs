@@ -4,9 +4,11 @@
 )]
 
 use crate::utilities::assert::ResultExtension;
+use std::env;
 use std::io;
 use std::io::Read;
 use std::io::Write;
+use std::path::Path;
 use std::process::Command;
 use std::process::Output;
 use std::process::Stdio;
@@ -15,6 +17,31 @@ use std::thread::JoinHandle;
 
 pub(crate) fn create_command() -> Command {
     Command::new(env!("CARGO_BIN_EXE_package-manager"))
+}
+
+pub(crate) fn set_environment(command: &mut Command, home: &Path) {
+    command.env_clear();
+
+    command.env("HOME", home);
+
+    // TODO: Figure out what to do with this.
+    propagate_env_var("PATH", command);
+
+    propagate_env_var("RUST_BACKTRACE", command);
+    propagate_env_var("RUST_LIB_BACKTRACE", command);
+    propagate_env_var("RUST_LOG", command);
+}
+
+fn propagate_env_var(variable: &str, command: &mut Command) {
+    if let Some(value) = env::var_os(variable) {
+        command.env(variable, value);
+    }
+}
+
+pub(crate) fn run_command_in(mut command: Command, directory: &Path) -> Output {
+    command.current_dir(directory);
+
+    run_command(command)
 }
 
 pub(crate) fn run_command(mut command: Command) -> Output {

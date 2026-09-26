@@ -1,10 +1,10 @@
 use crate::Compression;
 use crate::HostPath;
 use crate::Source;
+use crate::download::download_bytes;
 use anyhow::Context as _;
 use fn_error_context::context;
 use lzma_rs::xz_decompress;
-use reqwest::blocking::ClientBuilder;
 use std::io::Cursor;
 use tar::Archive;
 use url::Url;
@@ -15,16 +15,7 @@ pub(in crate::download) fn download_tarball(
     compression: Compression,
     source_directory: Box<HostPath>,
 ) -> anyhow::Result<Source> {
-    let client = ClientBuilder::new()
-        .timeout(None)
-        .build()
-        .context("initialising the http client")?;
-
-    let response = client.get(url.clone()).send()?;
-
-    let response = response.error_for_status()?;
-
-    let compressed_bytes = response.bytes()?;
+    let compressed_bytes = download_bytes(url.clone())?;
 
     let mut decompressed_bytes = Vec::new();
 
