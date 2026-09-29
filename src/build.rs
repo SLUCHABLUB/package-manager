@@ -6,10 +6,14 @@ use crate::HostPath;
 use crate::Image;
 use crate::PACKAGE_NAME;
 use crate::Recipe;
+use crate::RelativePath;
 use crate::Source;
 use crate::TargetDirectories;
 use crate::TargetPath;
+use crate::TargetPathEnum;
 use crate::recipe::Build;
+use crate::recipe::FileTransfer;
+use crate::recipe::ResolvedFileTransfer;
 use crate::result::convert_thread_error;
 use anyhow::Context;
 use anyhow::bail;
@@ -38,12 +42,6 @@ use tracing::info;
 use tracing::warn;
 
 const CONFIGURE_MAKE_DISTINATION_DIRECTORY: &str = concat!("DEST", "DIR");
-
-#[derive(Debug)]
-struct FileTransfer {
-    from: Box<HostPath>,
-    to: Box<TargetPath>,
-}
 
 #[derive(Copy, Clone, Deserialize, FromStr)]
 #[serde(rename_all = "snake_case")]
@@ -78,8 +76,11 @@ pub(crate) fn build(
         warn!("not checking the build dependency of `{dependency}` version {version}");
     }
 
-    // TODO: Generate this from `recipe.install`.
-    let mut copies = Vec::new();
+    let mut copies = resolve_file_transfers(
+        &recipe.install_data().copies,
+        &build_root,
+        target_directories,
+    );
 
     let commands = generate_commands(
         recipe.build_data(),
@@ -88,13 +89,24 @@ pub(crate) fn build(
         &working_directory,
         target_directories,
         &mut copies,
-    );
+    )?;
 
-    let image = build_in_sandbox(image, commands, working_directory, copies, sandbox)?;
+    let image = build_in_sandbox(image, commands, working_directory, &copies, sandbox)?;
 
     info!("built {}", recipe.name());
 
     Ok(image)
+}
+
+fn resolve_file_transfers(
+    file_transfers: &[FileTransfer],
+    build_root: &BuildRoot,
+    target: &TargetDirectories,
+) -> Vec<ResolvedFileTransfer> {
+    file_transfers
+        .iter()
+        .map(|file_transfer| file_transfer.resolve(build_root, target))
+        .collect()
 }
 
 fn generate_commands(
@@ -103,8 +115,8 @@ fn generate_commands(
     build_root: BuildRoot,
     working_directory: &BuildWorkingDirectory,
     target_directories: &TargetDirectories,
-    copies: &mut Vec<FileTransfer>,
-) -> Vec<Command> {
+    copies: &mut Vec<ResolvedFileTransfer>,
+) -> anyhow::Result<Vec<Command>> {
     let BuildRoot(build_root) = build_root;
     let BuildWorkingDirectory(working_directory) = working_directory;
 
@@ -130,9 +142,9 @@ fn generate_commands(
                 .arg("--locked")
                 .arg("--release")
                 .arg("--manifest-path")
-                .arg(&*cargo_manifest_path)
+                .arg(cargo_manifest_path)
                 .arg("--target-dir")
-                .arg(&*cargo_target_directory);
+                .arg(&cargo_target_directory);
 
             if !features.is_empty() {
                 cargo.arg("--features").arg(features.join(" "));
@@ -145,11 +157,14 @@ fn generate_commands(
             let artefact_path = cargo_target_directory
                 .with_suffix("release")
                 .with_suffix(&**binary);
-            let artefact_target_path = target_directories.executables().with_suffix(&**binary);
 
-            copies.push(FileTransfer {
-                from: artefact_path,
-                to: artefact_target_path,
+            let binary_path = RelativePath::new(&**binary)
+                .context("parsing crate name as a path component")?
+                .to_owned();
+
+            copies.push(ResolvedFileTransfer {
+                source: artefact_path,
+                destination: TargetPathEnum::executable(binary_path).resolve(target_directories),
             });
 
             commands.push(cargo);
@@ -199,7 +214,7 @@ fn generate_commands(
         }
     }
 
-    commands
+    Ok(commands)
 }
 
 fn flag(name: &str, path: &TargetPath) -> OsString {
@@ -219,7 +234,7 @@ fn build_in_sandbox(
     image: Box<HostPath>,
     commands: Vec<Command>,
     working_directory: BuildWorkingDirectory,
-    copies: Vec<FileTransfer>,
+    copies: &[ResolvedFileTransfer],
     sandbox: Sandbox,
 ) -> anyhow::Result<Image> {
     // TODO: Allow automatic sandbox downgrading.
@@ -236,7 +251,7 @@ fn build_locally(
     image: Box<HostPath>,
     mut commands: Vec<Command>,
     working_directory: BuildWorkingDirectory,
-    copies: Vec<FileTransfer>,
+    copies: &[ResolvedFileTransfer],
 ) -> anyhow::Result<Image> {
     let BuildWorkingDirectory(working_directory) = working_directory;
 
@@ -264,13 +279,13 @@ fn build_locally(
     }
 
     for copy in copies {
-        let destination = copy.to.with_root(&image);
+        let destination = copy.destination.with_root(&image);
         let destination: &Path = (*destination).as_ref();
 
         if let Some(parent) = destination.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::copy(copy.from, destination)?;
+        fs::copy(&copy.source, destination)?;
     }
 
     Ok(Image(image))
@@ -280,14 +295,17 @@ fn build_landlocked(
     image: Box<HostPath>,
     commands: Vec<Command>,
     working_directory: BuildWorkingDirectory,
-    copies: Vec<FileTransfer>,
+    copies: &[ResolvedFileTransfer],
 ) -> anyhow::Result<Image> {
-    thread::spawn(move || {
-        landlock_current_thread()?;
-        build_locally(image, commands, working_directory, copies)
+    thread::scope(|scope| {
+        scope
+            .spawn(move || {
+                landlock_current_thread()?;
+                build_locally(image, commands, working_directory, copies)
+            })
+            .join()
+            .map_err(convert_thread_error)?
     })
-    .join()
-    .map_err(convert_thread_error)?
 }
 
 #[context("enabling landlock")]

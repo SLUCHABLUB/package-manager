@@ -174,6 +174,13 @@ impl AsRef<Path> for HostPath {
     }
 }
 
+impl AsRef<OsStr> for Box<HostPath> {
+    fn as_ref(&self) -> &OsStr {
+        let HostPath(AbsolutePath(path)) = self.as_ref();
+        path.as_os_str()
+    }
+}
+
 impl AsRef<Path> for Box<HostPath> {
     fn as_ref(&self) -> &Path {
         let HostPath(AbsolutePath(path)) = self.as_ref();
@@ -314,6 +321,86 @@ impl<'de> Deserialize<'de> for Box<TargetPath> {
         Box::<Path>::deserialize(deserialiser).and_then(|path| {
             TargetPath::new_boxed(path).map_err(|path| {
                 serde::de::Error::custom(format!("the path `{}` is not absolute", path.display()))
+            })
+        })
+    }
+}
+
+#[derive(Eq, PartialEq, Hash, Debug, Serialize)]
+#[repr(transparent)]
+pub struct RelativePath(Path);
+
+impl RelativePath {
+    pub(crate) fn new_unchecked(path: &Path) -> &RelativePath {
+        // SAFETY: `RelativePath` is `repr(transparent)` around `Path`.
+        unsafe { &*(std::ptr::from_ref(path) as *const RelativePath) }
+    }
+
+    pub(crate) fn new_boxed_unchecked(path: Box<Path>) -> Box<RelativePath> {
+        // SAFETY: `RelativePath` is `repr(transparent)` around `Path`.
+        unsafe { transmute(path) }
+    }
+
+    pub(crate) fn new<P>(path: &P) -> Option<&RelativePath>
+    where
+        P: AsRef<Path> + ?Sized,
+    {
+        let path = path.as_ref();
+        path.is_relative().then(|| Self::new_unchecked(path))
+    }
+
+    pub(crate) fn new_boxed(path: Box<Path>) -> Result<Box<RelativePath>, Box<Path>> {
+        if path.is_relative() {
+            Ok(Self::new_boxed_unchecked(path))
+        } else {
+            Err(path)
+        }
+    }
+
+    pub(crate) fn relative_to_host(&self, root: &HostPath) -> Box<HostPath> {
+        let RelativePath(suffix) = self;
+        root.with_suffix(suffix)
+    }
+
+    pub(crate) fn relative_to_target(&self, root: &TargetPath) -> Box<TargetPath> {
+        let RelativePath(suffix) = self;
+        root.with_suffix(suffix)
+    }
+}
+
+impl Clone for Box<RelativePath> {
+    fn clone(&self) -> Self {
+        let RelativePath(path) = self.as_ref();
+        let path = Box::<Path>::from(path);
+        RelativePath::new_boxed_unchecked(path)
+    }
+}
+
+impl Display for RelativePath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let RelativePath(path) = self;
+        write!(f, "{}", path.display())
+    }
+}
+
+impl ToOwned for RelativePath {
+    type Owned = Box<RelativePath>;
+
+    fn to_owned(&self) -> Self::Owned {
+        let RelativePath(path) = self;
+
+        RelativePath::new_boxed_unchecked(Box::from(path))
+    }
+}
+
+impl<'de> Deserialize<'de> for Box<RelativePath> {
+    fn deserialize<D>(deserialiser: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Box::<Path>::deserialize(deserialiser).and_then(|path| {
+            RelativePath::new_boxed(path).map_err(|path| {
+                serde::de::Error::custom(format!("the path `{}` is not relative", path.display()))
             })
         })
     }

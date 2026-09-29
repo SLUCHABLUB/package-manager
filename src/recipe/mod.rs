@@ -1,6 +1,7 @@
 mod build;
 mod cache;
 mod download;
+mod install;
 
 pub(crate) use build::Build;
 pub(crate) use build::BuildSystem;
@@ -12,6 +13,10 @@ pub(crate) use cache::find_cached_download_lock_or_create;
 pub(crate) use download::Compression;
 pub(crate) use download::Download;
 pub(crate) use download::DownloadLock;
+pub(crate) use install::FileTransfer;
+pub(crate) use install::Install;
+pub(crate) use install::ResolvedFileTransfer;
+pub(crate) use install::TargetPathEnum;
 
 use crate::HostDirectories;
 use crate::HostPath;
@@ -67,6 +72,10 @@ impl Recipe {
         &self.data.version
     }
 
+    pub(crate) fn install_data(&self) -> &Install {
+        &self.data.install
+    }
+
     pub(crate) fn build_data(&self) -> &Build {
         &self.data.build
     }
@@ -99,6 +108,7 @@ struct RecipeData {
 
     download: Download,
     build: Build,
+    install: Install,
 
     #[serde(default)]
     dependencies: Dependencies,
