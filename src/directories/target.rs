@@ -1,3 +1,4 @@
+use crate::HostPath;
 use crate::TargetPath;
 use crate::directories::XDG_BIN_HOME;
 use crate::directories::XDG_CONFIG_HOME;
@@ -8,6 +9,7 @@ use crate::directories::XDG_PREFIX_HOME;
 use crate::directories::XDG_RUNTIME_DIR;
 use crate::directories::XDG_STATE_HOME;
 use anyhow::Context as _;
+use once_cell::sync::Lazy as LazyLock;
 use std::path::Path;
 
 pub(crate) struct TargetDirectories {
@@ -30,16 +32,21 @@ impl TargetDirectories {
     }
 
     fn user_inner() -> Option<TargetDirectories> {
-        let prefix = XDG_PREFIX_HOME.as_ref()?.to_target_path();
+        type EnvironmenVariable = &'static LazyLock<Option<Box<HostPath>>>;
 
-        let configuration = XDG_CONFIG_HOME.as_ref()?.to_target_path();
-        let data = XDG_DATA_HOME.as_ref()?.to_target_path();
-        let executables = XDG_BIN_HOME.as_ref()?.to_target_path();
-        let headers = XDG_INCLUDE_HOME.as_ref()?.to_target_path();
-        let libraries = XDG_LIB_HOME.as_ref()?.to_target_path();
-        let state = XDG_STATE_HOME.as_ref()?.to_target_path();
+        let from_environment =
+            |variable: EnvironmenVariable| variable.as_deref().map(HostPath::to_target_path);
 
-        let runtime = XDG_RUNTIME_DIR.as_ref()?.to_target_path();
+        let prefix = from_environment(&XDG_PREFIX_HOME)?;
+
+        let configuration = from_environment(&XDG_CONFIG_HOME)?;
+        let data = from_environment(&XDG_DATA_HOME)?;
+        let executables = from_environment(&XDG_BIN_HOME)?;
+        let headers = from_environment(&XDG_INCLUDE_HOME)?;
+        let libraries = from_environment(&XDG_LIB_HOME)?;
+        let state = from_environment(&XDG_STATE_HOME)?;
+
+        let runtime = from_environment(&XDG_RUNTIME_DIR)?;
 
         Some(TargetDirectories {
             prefix,

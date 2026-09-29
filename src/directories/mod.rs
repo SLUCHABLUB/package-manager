@@ -7,6 +7,8 @@ mod host;
 mod target;
 
 use crate::HostPath;
+use crate::ResultExtension as _;
+use anyhow::anyhow;
 use once_cell::sync::Lazy as LazyLock;
 use std::env;
 use std::path::PathBuf;
@@ -25,13 +27,9 @@ static HOME: LazyLock<Option<Box<HostPath>>> = LazyLock::new(|| {
     // I think this should be a no-op.
     let path = buffer.into_boxed_path();
 
-    match HostPath::new_boxed(path) {
-        Ok(path) => Some(path),
-        Err(path) => {
-            error!("the home directory (`{}`) is not absolute", path.display());
-            None
-        }
-    }
+    HostPath::new_boxed(path)
+        .map_err(|path| anyhow!("the home directory (`{}`) is not absolute", path.display()))
+        .ok_or_log()
 });
 
 // TODO: Set the XDG variables on esoteric OSes like darwin and dos.
@@ -103,14 +101,12 @@ fn parse_xdg_variable_or_else(
     // This *should* be a no-op.
     let path = PathBuf::from(path).into_boxed_path();
 
-    match HostPath::new_boxed(path) {
-        Ok(path) => Some(path),
-        Err(path) => {
-            warn!(
+    HostPath::new_boxed(path)
+        .map_err(|path| {
+            anyhow!(
                 "the contents of the `{variable}` environment variable (`{}`) was not an absolute path",
                 path.display()
-            );
-            None
-        }
-    }
+            )
+        })
+        .ok_or_log()
 }
