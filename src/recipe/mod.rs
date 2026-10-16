@@ -15,8 +15,8 @@ pub(crate) use download::Download;
 pub(crate) use download::DownloadLock;
 pub(crate) use install::FileTransfer;
 pub(crate) use install::Install;
+pub(crate) use install::NamespacedTargetPath;
 pub(crate) use install::ResolvedFileTransfer;
-pub(crate) use install::TargetPathEnum;
 
 use crate::HostDirectories;
 use crate::HostPath;
@@ -108,6 +108,7 @@ struct RecipeData {
 
     download: Download,
     build: Build,
+    #[serde(default)]
     install: Install,
 
     #[serde(default)]

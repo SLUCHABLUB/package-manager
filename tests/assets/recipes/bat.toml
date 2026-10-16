@@ -7,6 +7,9 @@ repository = "sharkdp/bat"
 system = "cargo"
 binary = "bat"
 
+[build.dependencies]
+cargo = "any"
+
 [dependencies]
 # TODO: Use a range
 "libgit2.so".exact = "1.9"

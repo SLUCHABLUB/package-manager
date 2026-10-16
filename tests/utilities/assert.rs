@@ -32,7 +32,7 @@ where
 
 #[track_caller]
 pub(crate) fn assert_no_stdout(output: &Output) {
-    assert!(output.stdout.is_empty());
+    assert_eq!(output.stdout, []);
 }
 #[track_caller]
 pub(crate) fn assert_success(output: &Output) {

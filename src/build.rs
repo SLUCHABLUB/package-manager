@@ -4,13 +4,13 @@ use crate::BuildWorkingDirectory;
 use crate::HostDirectories;
 use crate::HostPath;
 use crate::Image;
+use crate::NamespacedTargetPath;
 use crate::PACKAGE_NAME;
 use crate::Recipe;
 use crate::RelativePath;
 use crate::Source;
 use crate::TargetDirectories;
 use crate::TargetPath;
-use crate::TargetPathEnum;
 use crate::recipe::Build;
 use crate::recipe::FileTransfer;
 use crate::recipe::ResolvedFileTransfer;
@@ -164,7 +164,8 @@ fn generate_commands(
 
             copies.push(ResolvedFileTransfer {
                 source: artefact_path,
-                destination: TargetPathEnum::executable(binary_path).resolve(target_directories),
+                destination: NamespacedTargetPath::executable(binary_path)
+                    .resolve(target_directories),
             });
 
             commands.push(cargo);
