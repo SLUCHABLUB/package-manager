@@ -1,5 +1,6 @@
 mod arguments;
 mod build;
+mod dag;
 mod dependencies;
 mod directories;
 mod download;
@@ -17,6 +18,7 @@ mod staging;
 mod version;
 
 pub(crate) use build::build;
+pub(crate) use dag::Dag;
 pub(crate) use dependencies::check_runtime_dependencies;
 pub(crate) use directories::HostDirectories;
 pub(crate) use directories::TargetDirectories;

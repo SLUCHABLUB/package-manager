@@ -1,3 +1,5 @@
+use crate::Dag;
+use crate::Dependencies;
 use crate::DownloadLock;
 use crate::HostDirectories;
 use crate::Image;
@@ -17,25 +19,27 @@ use crate::hash;
 use crate::recipe::Build;
 use crate::stage;
 use anyhow::anyhow;
-use by_address::ByAddress;
-use daggy::Dag;
-use daggy::NodeIndex;
-use daggy::Walker as _;
-use daggy::WouldCycle;
 use fn_error_context::context;
-use rapidhash::HashMapExt as _;
-use rapidhash::RapidHashMap;
+use petgraph::acyclic::AcyclicEdgeError;
+use petgraph::graph::NodeIndex;
 use std::collections::BTreeSet;
-use std::mem;
+use std::ptr;
 use tracing::info;
 
 #[derive(Debug)]
+struct RuntimeDependency;
+#[derive(Copy, Clone, Debug)]
+struct BuildDependency;
+
+// The two graphs share nodes && indexes.
+#[derive(Debug)]
 pub(crate) struct LockPlan {
-    // TODO: Add a graph for the build dependencies.
+    // TODO: Can these be merged into a single graph?
     /// A graph containing all the recipes and edges for their runtime dependencies.
-    dependency_graph: Dag<&'static Recipe, ()>,
-    /// A map from recipe (assumed to be from the store) to index in the graph.
-    recipe_indexes: RapidHashMap<ByAddress<&'static Recipe>, NodeIndex>,
+    runtime_dependencies: Dag<&'static Recipe, RuntimeDependency>,
+
+    /// A graph containing all the recipes and edges for their runtime dependencies.
+    build_dependencies: Dag<&'static Recipe, BuildDependency>,
 }
 
 #[derive(Debug)]
@@ -47,21 +51,20 @@ struct LockedRecipe {
 #[derive(Debug)]
 pub(crate) struct HashPlan {
     /// A graph containing all the recipes and edges for their runtime dependencies.
-    dependency_graph: Dag<LockedRecipe, ()>,
+    runtime_dependencies: Dag<LockedRecipe, RuntimeDependency>,
+    build_dependencies: Dag<&'static Recipe, BuildDependency>,
 }
 
 #[derive(Debug)]
 struct HashedRecipe {
     recipe: &'static Recipe,
     lock: DownloadLock,
-    // TODO: Use this to find determine if the recipe is installed.
-    #[expect(unused)]
     hash: u64,
 }
 
 #[derive(Debug)]
 pub(crate) struct DownloadPlan {
-    recipes: Vec<HashedRecipe>,
+    recipes: Dag<HashedRecipe, BuildDependency>,
 }
 
 #[derive(Debug)]
@@ -79,7 +82,7 @@ struct InstalledRecipe {
 
 #[derive(Debug)]
 pub(crate) struct BuildPlan {
-    recipes: Vec<DownloadedRecipe>,
+    recipes: Dag<DownloadedRecipe, BuildDependency>,
     installed_recipes: Vec<InstalledRecipe>,
 }
 
@@ -111,8 +114,8 @@ pub(crate) struct StagePlan {
 impl LockPlan {
     pub(crate) fn new() -> LockPlan {
         LockPlan {
-            dependency_graph: Dag::new(),
-            recipe_indexes: RapidHashMap::new(),
+            runtime_dependencies: Dag::new(),
+            build_dependencies: Dag::new(),
         }
     }
 
@@ -135,100 +138,150 @@ impl LockPlan {
     ) -> anyhow::Result<(NodeIndex, &'static Recipe)> {
         let recipe = recipes.find(name, version)?;
 
-        if let Some(index) = self.recipe_indexes.get(&ByAddress(recipe)) {
-            return Ok((*index, recipe));
+        if let Some(recipe) = self.find_added_recipe(recipe) {
+            return Ok(recipe);
         }
 
-        let index = self.dependency_graph.add_node(recipe);
-        self.recipe_indexes.insert(ByAddress(recipe), index);
+        let index = self.runtime_dependencies.add_node(recipe);
 
-        for (dependency, version) in &recipe.dependencies().versions {
-            let (child_index, child) = self.add_recipe_inner(dependency, version, recipes)?;
-            self.dependency_graph
-                .add_edge(index, child_index, ())
-                .map_err(|WouldCycle(())| {
-                    anyhow!(
-                        "cyclic dependency found between `{}` version `{}` and `{}` version `{}`",
-                        recipe.name(),
-                        recipe.version(),
-                        child.name(),
-                        child.version()
-                    )
-                })?;
-        }
+        // This should return the same value as `index`.
+        self.build_dependencies.add_node(recipe);
+
+        self.add_children(
+            recipe,
+            index,
+            recipe.dependencies(),
+            |plan| &mut plan.runtime_dependencies,
+            || RuntimeDependency,
+            "runtime",
+            recipes,
+        )?;
+
+        self.add_children(
+            recipe,
+            index,
+            &recipe.build_data().dependencies,
+            |plan| &mut plan.build_dependencies,
+            || BuildDependency,
+            "build",
+            recipes,
+        )?;
 
         Ok((index, recipe))
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn add_children<Dependency: 'static>(
+        &mut self,
+        recipe: &'static Recipe,
+        index: NodeIndex,
+        dependencies: &Dependencies,
+        // Since `&mut self` takes all of self as mutable, this needs to be a function.
+        mut graph: impl FnMut(&mut Self) -> &mut Dag<&'static Recipe, Dependency>,
+        mut edge: impl FnMut() -> Dependency,
+        dependency_type: &'static str,
+        recipes: &'static RecipeStore,
+    ) -> anyhow::Result<()> {
+        for (dependency, version) in &dependencies.versions {
+            let (child_index, child) = self.add_recipe_inner(dependency, version, recipes)?;
+            graph(self)
+                .add_edge(index, child_index, edge())
+                .map_err(|error| runtime_cycle_error(&error, recipe, child, dependency_type))?;
+        }
+
+        Ok(())
+    }
+
+    fn find_added_recipe(&self, recipe: &'static Recipe) -> Option<(NodeIndex, &'static Recipe)> {
+        // Since both graphs have the same nodes and indexes, it doesn't matter which one we use here.
+        self.runtime_dependencies
+            .indexed_nodes()
+            .map(|(index, node)| (index, *node))
+            .find(|(_, node)| ptr::eq(*node, recipe))
+    }
+
     pub(crate) fn lock(self, host: &HostDirectories) -> anyhow::Result<HashPlan> {
         let LockPlan {
-            dependency_graph: old_graph,
-            recipe_indexes: old_indexs,
+            runtime_dependencies,
+            build_dependencies,
         } = self;
-
-        let mut new_graph = Dag::new();
-        let mut new_indexes = vec![NodeIndex::new(0); old_indexs.len()];
 
         info!("generating recipe download locks");
 
-        for (ByAddress(recipe), old_index) in old_indexs {
-            let locked = LockedRecipe {
+        let runtime_dependencies = runtime_dependencies.try_map(|recipe| {
+            anyhow::Ok(LockedRecipe {
                 recipe,
                 lock: find_cached_download_lock_or_create(recipe, host)?,
-            };
-
-            let new_index = new_graph.add_node(locked);
-            new_indexes[old_index.index()] = new_index;
-        }
-
-        for old_index in 0..old_graph.node_count() {
-            let old_index = NodeIndex::new(old_index);
-            let new_index = new_indexes[old_index.index()];
-
-            for (_edge_index, old_child_index) in old_graph.children(old_index).iter(&old_graph) {
-                let new_child_index = new_indexes[old_child_index.index()];
-                new_graph
-                    .add_edge(new_index, new_child_index, ())
-                    .expect("this should not cycle since the graph should be the same");
-            }
-        }
+            })
+        })?;
 
         info!("generated all locks");
 
         Ok(HashPlan {
-            dependency_graph: new_graph,
+            runtime_dependencies,
+            build_dependencies,
         })
+    }
+}
+
+fn runtime_cycle_error(
+    error: &AcyclicEdgeError<NodeIndex>,
+    parent: &Recipe,
+    child: &Recipe,
+    dependency_type: &'static str,
+) -> anyhow::Error {
+    match error {
+        // The index here is either the parent or the child.
+        AcyclicEdgeError::Cycle(_) => anyhow!(
+            "cyclic {dependency_type} dependency found between `{}` version `{}` and `{}` version `{}`",
+            parent.name(),
+            parent.version(),
+            child.name(),
+            child.version()
+        ),
+        AcyclicEdgeError::SelfLoop => anyhow!(
+            "{dependency_type} dependency found from `{}` version `{}` to itself",
+            parent.name(),
+            parent.version(),
+        ),
+        AcyclicEdgeError::InvalidEdge => anyhow!(
+            "unable to add {dependency_type} dependency from `{}` version `{}` to `{}` version `{}`",
+            parent.name(),
+            parent.version(),
+            child.name(),
+            child.version()
+        ),
     }
 }
 
 impl HashPlan {
     pub(crate) fn hash(self) -> DownloadPlan {
         let HashPlan {
-            mut dependency_graph,
+            runtime_dependencies,
+            build_dependencies,
         } = self;
-
-        let mut hashed_recipes = Vec::with_capacity(dependency_graph.node_count());
-        let mut hashes = vec![0; dependency_graph.node_count()].into_boxed_slice();
 
         info!("generating recipe hashes");
 
-        for index in 0..dependency_graph.node_count() {
-            let index = NodeIndex::new(index);
+        let mut locked_recipes: Vec<_> = runtime_dependencies.into_nodes().collect();
+        let mut locked_recipe = |recipe| {
+            let index = locked_recipes
+                .iter()
+                .position(|locked| ptr::eq(locked.recipe, recipe))
+                .expect("the recipe should not have been taken");
 
-            let hash = Self::hash_recipe(index, &dependency_graph, &mut hashes);
+            locked_recipes.swap_remove(index)
+        };
 
-            let LockedRecipe { recipe, lock } = dependency_graph
-                .node_weight_mut(index)
-                .expect("a node should exist for the index");
+        let hashed_recipes = build_dependencies.recursive_map(|recipe, dependencies| {
+            let locked_recipe = locked_recipe(recipe);
 
-            let hashed_recipe = HashedRecipe {
-                recipe,
-                lock: mem::replace(lock, DownloadLock::None),
-                hash,
-            };
+            let hash = hash_recipe(&locked_recipe, dependencies);
 
-            hashed_recipes.push(hashed_recipe);
-        }
+            let LockedRecipe { recipe, lock } = locked_recipe;
+
+            HashedRecipe { recipe, lock, hash }
+        });
 
         info!("generated all recipe hashes");
 
@@ -236,49 +289,37 @@ impl HashPlan {
             recipes: hashed_recipes,
         }
     }
+}
 
-    fn hash_recipe(index: NodeIndex, graph: &Dag<LockedRecipe, ()>, hashes: &mut [u64]) -> u64 {
-        // If a recipe actually has a hash of 0, it'll just be recalculated a couple of times.
-        let cached = hashes[index.index()];
-        if cached != 0 {
-            return cached;
-        }
+fn hash_recipe<'recipes>(
+    locked: &LockedRecipe,
+    dependencies: impl IntoIterator<Item = &'recipes HashedRecipe>,
+) -> u64 {
+    let dependencies = dependencies
+        .into_iter()
+        .map(|dependency| dependency.hash)
+        .collect();
 
-        let mut dependencies = BTreeSet::new();
+    let hash_input: (&Build, &DownloadLock, BTreeSet<u64>) =
+        (locked.recipe.build_data(), &locked.lock, dependencies);
 
-        for (_edge, child) in graph.children(index).iter(graph) {
-            dependencies.insert(Self::hash_recipe(child, graph, hashes));
-        }
-
-        let node = graph
-            .node_weight(index)
-            .expect("a node should exist for the index");
-
-        let hash_input: (&Build, &DownloadLock, BTreeSet<u64>) =
-            (node.recipe.build_data(), &node.lock, dependencies);
-
-        let hash = hash(hash_input);
-
-        hashes[index.index()] = hash;
-        hash
-    }
+    hash(hash_input)
 }
 
 impl DownloadPlan {
     pub(crate) fn download(self, host: &HostDirectories) -> anyhow::Result<BuildPlan> {
-        let mut downloaded_recipes = Vec::new();
+        let locked_recipes = self.recipes;
 
         info!("downloading the recipe sources");
 
-        // TODO: Parallelise.
-        for locked in self.recipes {
+        let downloaded_recipes = locked_recipes.try_map(|locked| {
             let source = download(locked.recipe, &locked.lock, host)?;
 
-            downloaded_recipes.push(DownloadedRecipe {
+            anyhow::Ok(DownloadedRecipe {
                 recipe: locked.recipe,
                 source,
-            });
-        }
+            })
+        })?;
 
         info!("finished all downloads");
 
@@ -297,19 +338,23 @@ impl BuildPlan {
         target: &TargetDirectories,
         host: &HostDirectories,
     ) -> anyhow::Result<CheckPlan> {
-        let mut built_recipes = Vec::new();
+        let downloaded_recipes = self.recipes;
 
         info!("building the packages");
 
         // TODO: Parallelise.
-        for downloaded in self.recipes {
-            let image = build(downloaded.recipe, downloaded.source, sandbox, target, host)?;
+        let built_recipes = downloaded_recipes
+            .reduce_leaves(|downloaded, _child_images| {
+                // TODO: Make the child images available for the build command
 
-            built_recipes.push(BuiltRecipe {
-                recipe: downloaded.recipe,
-                image,
-            });
-        }
+                let image = build(downloaded.recipe, downloaded.source, sandbox, target, host)?;
+
+                anyhow::Ok(BuiltRecipe {
+                    recipe: downloaded.recipe,
+                    image,
+                })
+            })
+            .collect::<Result<_, _>>()?;
 
         info!("built all packages");
 
