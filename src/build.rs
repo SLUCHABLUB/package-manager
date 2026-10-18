@@ -333,7 +333,7 @@ where
     thread::scope(|scope| {
         scope
             .spawn(move || {
-                landlock_current_thread(build_root, dependencies, &image)?;
+                landlock_current_thread(build_root, &working_directory, dependencies, &image)?;
                 build_locally(image, commands, working_directory, copies)
             })
             .join()
@@ -344,6 +344,7 @@ where
 #[context("enabling landlock")]
 fn landlock_current_thread<'dependencies>(
     build_root: BuildRoot,
+    working_directory: &BuildWorkingDirectory,
     dependencies: impl IntoIterator<Item = &'dependencies Image>,
     image: &HostPath,
 ) -> anyhow::Result<()> {
@@ -367,6 +368,12 @@ fn landlock_current_thread<'dependencies>(
     ruleset = ruleset.add_rule(PathBeneath::new(
         PathFd::new(build_root)?,
         AccessFs::from_read(ABI),
+    ))?;
+
+    let BuildWorkingDirectory(working_directory) = working_directory;
+    ruleset = ruleset.add_rule(PathBeneath::new(
+        PathFd::new(working_directory)?,
+        AccessFs::from_all(ABI),
     ))?;
 
     for image in dependencies {
