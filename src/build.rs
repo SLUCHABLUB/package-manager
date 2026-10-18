@@ -370,7 +370,11 @@ fn landlock_current_thread<'dependencies>(
     ))?;
 
     for image in dependencies {
-        todo!("{image:?}");
+        let Image(path) = image;
+        ruleset = ruleset.add_rule(PathBeneath::new(
+            PathFd::new(path)?,
+            AccessFs::from_read(ABI),
+        ))?;
     }
 
     ruleset = ruleset.add_rule(PathBeneath::new(
