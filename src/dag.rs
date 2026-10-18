@@ -38,7 +38,7 @@ impl<Node, Edge: 'static> Dag<Node, Edge> {
         self.inner.try_add_edge(from, to, edge).map(|_| ())
     }
 
-    pub(crate) fn recursive_map<NewNode>(
+    pub(crate) fn recursive_map<NewNode: Send + Sync>(
         self,
         mut function: impl FnMut(Node, ChildIterator<NewNode>) -> NewNode,
     ) -> Dag<NewNode, Edge> {
@@ -142,10 +142,13 @@ impl<Node, Edge: 'static> Dag<Node, Edge> {
     /// Walks a `Dag` by visiting all children of a node before it.
     /// The function at each node gets the result from its children.
     /// The returned iterator is over the results of the root nodes.
-    pub(crate) fn reduce_leaves<Output>(
+    pub(crate) fn try_reduce_leaves<Output, Error>(
         self,
-        mut function: impl FnMut(Node, ChildIterator<Output>) -> Output,
-    ) -> impl Iterator<Item = Output> {
+        mut function: impl FnMut(Node, ChildIterator<Output>) -> Result<Output, Error>,
+    ) -> Result<impl Iterator<Item = Output> + Send, Error>
+    where
+        Output: Send + Sync,
+    {
         let mut outputs = RapidHashMap::new();
 
         // We need to collect here to not capture the DAG.
@@ -166,12 +169,12 @@ impl<Node, Edge: 'static> Dag<Node, Edge> {
             let mut children = children.into_iter().map(|index| &outputs[&index]);
             let children = ChildIterator(&mut children);
 
-            let result = function(node, children);
+            let result = function(node, children)?;
 
             outputs.insert(index, result);
         }
 
-        outputs.into_values()
+        Ok(outputs.into_values())
     }
 
     fn get_mut(&mut self, index: NodeIndex) -> Option<&mut Node> {
@@ -204,7 +207,7 @@ impl<Node, Edge: 'static> Dag<Node, Edge> {
     }
 }
 
-pub struct ChildIterator<'nodes, Node>(&'nodes mut dyn Iterator<Item = &'nodes Node>);
+pub struct ChildIterator<'nodes, Node>(&'nodes mut (dyn Iterator<Item = &'nodes Node> + Send));
 
 impl<'nodes, Node> Iterator for ChildIterator<'nodes, Node> {
     type Item = &'nodes Node;

@@ -344,17 +344,24 @@ impl BuildPlan {
 
         // TODO: Parallelise.
         let built_recipes = downloaded_recipes
-            .reduce_leaves(|downloaded, _child_images| {
+            .try_reduce_leaves::<BuiltRecipe, _>(|downloaded, children| {
                 // TODO: Make the child images available for the build command
 
-                let image = build(downloaded.recipe, downloaded.source, sandbox, target, host)?;
+                let image = build(
+                    downloaded.recipe,
+                    downloaded.source,
+                    children.map(|built| &built.image),
+                    sandbox,
+                    target,
+                    host,
+                )?;
 
                 anyhow::Ok(BuiltRecipe {
                     recipe: downloaded.recipe,
                     image,
                 })
-            })
-            .collect::<Result<_, _>>()?;
+            })?
+            .collect();
 
         info!("built all packages");
 

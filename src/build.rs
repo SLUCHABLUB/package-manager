@@ -30,8 +30,11 @@ use landlock::AccessNet;
 use landlock::CompatLevel;
 use landlock::Compatible as _;
 use landlock::LandlockStatus;
+use landlock::PathBeneath;
+use landlock::PathFd;
 use landlock::Ruleset;
 use landlock::RulesetAttr as _;
+use landlock::RulesetCreatedAttr;
 use landlock::RulesetStatus;
 use serde::Deserialize;
 use std::ffi::OsString;
@@ -52,13 +55,17 @@ pub(crate) enum Sandbox {
 }
 
 #[context("building {recipe}")]
-pub(crate) fn build(
+pub(crate) fn build<'dependencies, Items>(
     recipe: &Recipe,
     source: Source,
+    dependencies: Items,
     sandbox: Sandbox,
     target_directories: &TargetDirectories,
     host: &HostDirectories,
-) -> anyhow::Result<Image> {
+) -> anyhow::Result<Image>
+where
+    Items: IntoIterator<Item = &'dependencies Image> + Send,
+{
     let image = match Image::find_cached(recipe, host)? {
         Ok(cached) => return Ok(cached),
         Err(unitialised) => unitialised,
@@ -85,13 +92,21 @@ pub(crate) fn build(
     let commands = generate_commands(
         recipe.build_data(),
         &image,
-        build_root,
+        &build_root,
         &working_directory,
         target_directories,
         &mut copies,
     )?;
 
-    let image = build_in_sandbox(image, commands, working_directory, &copies, sandbox)?;
+    let image = build_in_sandbox(
+        build_root,
+        image,
+        commands,
+        working_directory,
+        &copies,
+        dependencies,
+        sandbox,
+    )?;
 
     info!("built {}", recipe.name());
 
@@ -112,7 +127,7 @@ fn resolve_file_transfers(
 fn generate_commands(
     build: &Build,
     image: &HostPath,
-    build_root: BuildRoot,
+    build_root: &BuildRoot,
     working_directory: &BuildWorkingDirectory,
     target_directories: &TargetDirectories,
     copies: &mut Vec<ResolvedFileTransfer>,
@@ -231,20 +246,32 @@ fn flag(name: &str, path: &TargetPath) -> OsString {
     buffer
 }
 
-fn build_in_sandbox(
+fn build_in_sandbox<'dependencies, Images>(
+    build_root: BuildRoot,
     image: Box<HostPath>,
     commands: Vec<Command>,
     working_directory: BuildWorkingDirectory,
     copies: &[ResolvedFileTransfer],
+    dependencies: Images,
     sandbox: Sandbox,
-) -> anyhow::Result<Image> {
+) -> anyhow::Result<Image>
+where
+    Images: IntoIterator<Item = &'dependencies Image> + Send,
+{
     // TODO: Allow automatic sandbox downgrading.
     match sandbox {
         Sandbox::None => {
             warn!("not sand-boxing the build");
             build_locally(image, commands, working_directory, copies)
         }
-        Sandbox::Landlock => build_landlocked(image, commands, working_directory, copies),
+        Sandbox::Landlock => build_landlocked(
+            build_root,
+            image,
+            commands,
+            working_directory,
+            copies,
+            dependencies,
+        ),
     }
 }
 
@@ -292,16 +319,21 @@ fn build_locally(
     Ok(Image(image))
 }
 
-fn build_landlocked(
+fn build_landlocked<'dependencies, Images>(
+    build_root: BuildRoot,
     image: Box<HostPath>,
     commands: Vec<Command>,
     working_directory: BuildWorkingDirectory,
     copies: &[ResolvedFileTransfer],
-) -> anyhow::Result<Image> {
+    dependencies: Images,
+) -> anyhow::Result<Image>
+where
+    Images: IntoIterator<Item = &'dependencies Image> + Send,
+{
     thread::scope(|scope| {
         scope
             .spawn(move || {
-                landlock_current_thread()?;
+                landlock_current_thread(build_root, dependencies, &image)?;
                 build_locally(image, commands, working_directory, copies)
             })
             .join()
@@ -310,7 +342,11 @@ fn build_landlocked(
 }
 
 #[context("enabling landlock")]
-fn landlock_current_thread() -> anyhow::Result<()> {
+fn landlock_current_thread<'dependencies>(
+    build_root: BuildRoot,
+    dependencies: impl IntoIterator<Item = &'dependencies Image>,
+    image: &HostPath,
+) -> anyhow::Result<()> {
     // TODO: We could parameterise this.
     // This should be the latest landlock API.
     const ABI: ABI = ABI::V9;
@@ -321,12 +357,28 @@ fn landlock_current_thread() -> anyhow::Result<()> {
     let file_system_access = AccessFs::from_all(ABI);
     let network_access = AccessNet::from_all(ABI);
 
-    let status = Ruleset::default()
+    let mut ruleset = Ruleset::default()
         .handle_access(file_system_access)?
         .handle_access(network_access)?
         .set_compatibility(compatibility)
-        .create()?
-        .restrict_self()?;
+        .create()?;
+
+    let BuildRoot(build_root) = build_root;
+    ruleset = ruleset.add_rule(PathBeneath::new(
+        PathFd::new(build_root)?,
+        AccessFs::from_read(ABI),
+    ))?;
+
+    for image in dependencies {
+        todo!("{image:?}");
+    }
+
+    ruleset = ruleset.add_rule(PathBeneath::new(
+        PathFd::new(image)?,
+        AccessFs::from_all(ABI),
+    ))?;
+
+    let status = ruleset.restrict_self()?;
 
     match status.landlock {
         LandlockStatus::NotEnabled => bail!("landlock is disabled in the kernel"),

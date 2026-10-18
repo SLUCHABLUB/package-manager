@@ -48,7 +48,12 @@ pub(crate) fn download(
             repository,
             url,
             commit,
-        } => download_git(repository, url, *commit, source_directory)?,
+        } => download_git(
+            &repository.to_thread_local(),
+            url,
+            *commit,
+            source_directory,
+        )?,
         DownloadLock::Tarball {
             virtual_url: _,
             compression,

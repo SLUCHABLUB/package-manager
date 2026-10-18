@@ -10,7 +10,7 @@ use anyhow::bail;
 use derive_where::derive_where;
 use fs_err as fs;
 use gix::ObjectId;
-use gix::Repository;
+use gix::ThreadSafeRepository;
 use serde::Deserialize;
 use serde::Serialize;
 use url::Url;
@@ -50,7 +50,7 @@ impl Download {
 
                 let repository = find_cached_repository_or_initialise(&url, host)?;
 
-                let commit = resolve_commit(&repository, &url, version)?;
+                let commit = resolve_commit(&repository.to_thread_local(), &url, version)?;
 
                 DownloadLock::Git {
                     repository: Box::new(repository),
@@ -123,7 +123,7 @@ pub(crate) enum DownloadLock {
         // Boxed so clippy doesn't complain about it's size.
         #[serde(skip_serializing)]
         #[derive_where(skip(Hash))]
-        repository: Box<Repository>,
+        repository: Box<ThreadSafeRepository>,
     },
     Tarball {
         // TODO: Switch the option between these two.

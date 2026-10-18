@@ -8,7 +8,8 @@ use anyhow::bail;
 use fs_err::create_dir_all;
 use fs_err::read_dir;
 use fs_err::remove_dir_all;
-use gix::Repository;
+use gix::ThreadSafeRepository;
+use gix::create;
 use rapidhash::v3::rapidhash_v3;
 use std::io;
 use std::path::Path;
@@ -44,15 +45,16 @@ pub(crate) fn find_cached_download_lock_or_create(
 pub(super) fn find_cached_repository_or_initialise(
     url: &Url,
     host: &HostDirectories,
-) -> anyhow::Result<Repository> {
+) -> anyhow::Result<ThreadSafeRepository> {
     let path = host.repositories.with_suffix(encode_url(url));
 
     if is_directory_populated(&path)? {
         info!("using the cached repository");
-        gix::open(&*path).context("opening the cached repository")
+        ThreadSafeRepository::open(&*path).context("opening the cached repository")
     } else {
         create_dir_all(&path)?;
-        gix::init_bare(&path).context("initialising the git repository")
+        ThreadSafeRepository::init(&path, create::Kind::Bare, create::Options::default())
+            .context("initialising the git repository")
     }
 }
 
