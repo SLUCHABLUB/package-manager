@@ -37,6 +37,17 @@ impl FileTransfer {
             destination: self.destination.resolve(target),
         }
     }
+
+    pub(crate) fn resolve_slice(
+        file_transfers: &[FileTransfer],
+        build_root: &BuildRoot,
+        target: &TargetDirectories,
+    ) -> Vec<ResolvedFileTransfer> {
+        file_transfers
+            .iter()
+            .map(|file_transfer| file_transfer.resolve(build_root, target))
+            .collect()
+    }
 }
 
 #[derive(Clone, Hash, Debug)]
