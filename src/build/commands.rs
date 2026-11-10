@@ -2,6 +2,7 @@ use crate::BuildRoot;
 use crate::BuildSystem;
 use crate::BuildWorkingDirectory;
 use crate::HostPath;
+use crate::Image;
 use crate::NamespacedTargetPath;
 use crate::RelativePath;
 use crate::TargetDirectories;
@@ -9,20 +10,25 @@ use crate::TargetPath;
 use crate::recipe::Build;
 use crate::recipe::ResolvedFileTransfer;
 use anyhow::Context as _;
+use std::env;
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::process::Command;
 
 const CONFIGURE_MAKE_DISTINATION_DIRECTORY: &str = concat!("DEST", "DIR");
 
-pub(super) fn generate_commands(
+pub(super) fn generate_commands<'dependencies, Images>(
     build: &Build,
     image: &HostPath,
     build_root: &BuildRoot,
     working_directory: &BuildWorkingDirectory,
     target_directories: &TargetDirectories,
     copies: &mut Vec<ResolvedFileTransfer>,
-) -> anyhow::Result<Vec<Command>> {
+    dependencies: Images,
+) -> anyhow::Result<Vec<Command>>
+where
+    Images: IntoIterator<Item = &'dependencies Image> + Clone,
+{
     let mut commands = match &build.system {
         BuildSystem::None => Vec::new(),
         // TODO: Should we add the version requirement here?
@@ -39,6 +45,7 @@ pub(super) fn generate_commands(
                 target_directories,
                 build_root,
                 working_directory,
+                dependencies,
             )?;
 
             copies.push(copy);
@@ -51,7 +58,8 @@ pub(super) fn generate_commands(
             target_directories,
             build_root,
             working_directory,
-        )
+            dependencies,
+        )?
         .into(),
     };
 
@@ -77,7 +85,16 @@ fn flag(name: &str, path: &TargetPath) -> OsString {
     buffer
 }
 
-fn command<S: AsRef<OsStr>>(executable: S, working_directory: &BuildWorkingDirectory) -> Command {
+fn command<'dependencies, Executable, Images>(
+    executable: Executable,
+    working_directory: &BuildWorkingDirectory,
+    target: &TargetDirectories,
+    dependencies: Images,
+) -> anyhow::Result<Command>
+where
+    Executable: AsRef<OsStr>,
+    Images: IntoIterator<Item = &'dependencies Image>,
+{
     let BuildWorkingDirectory(working_directory) = working_directory;
 
     let mut command = Command::new(executable);
@@ -85,10 +102,19 @@ fn command<S: AsRef<OsStr>>(executable: S, working_directory: &BuildWorkingDirec
     command.env_clear();
     command.current_dir(working_directory);
 
-    command
+    command.env(
+        "PATH",
+        env::join_paths(
+            dependencies
+                .into_iter()
+                .map(|Image(image)| target.executables().with_root(image)),
+        )?,
+    );
+
+    Ok(command)
 }
 
-fn cargo(
+fn cargo<'dependencies, Images>(
     // TODO: Move these into a struct.
     binary: &str,
     features: &[Box<str>],
@@ -97,8 +123,12 @@ fn cargo(
     target_directories: &TargetDirectories,
     build_root: &BuildRoot,
     working_directory: &BuildWorkingDirectory,
-) -> anyhow::Result<(Command, ResolvedFileTransfer)> {
-    let mut command = command("cargo", working_directory);
+    dependencies: Images,
+) -> anyhow::Result<(Command, ResolvedFileTransfer)>
+where
+    Images: IntoIterator<Item = &'dependencies Image>,
+{
+    let mut command = command("cargo", working_directory, target_directories, dependencies)?;
 
     let BuildRoot(build_root) = build_root;
     let BuildWorkingDirectory(working_directory) = working_directory;
@@ -141,19 +171,28 @@ fn cargo(
     Ok((command, artefact))
 }
 
-fn configure_make(
+fn configure_make<'dependencies, Images>(
     configure_flags: &[Box<str>],
 
     image: &HostPath,
     target: &TargetDirectories,
     build_root: &BuildRoot,
     working_directory: &BuildWorkingDirectory,
-) -> [Command; 3] {
+    dependencies: Images,
+) -> anyhow::Result<[Command; 3]>
+where
+    Images: IntoIterator<Item = &'dependencies Image> + Clone,
+{
     let BuildRoot(build_root) = build_root;
 
     let cpu_count = num_cpus::get();
 
-    let mut configure = command(&*build_root.with_suffix("configure"), working_directory);
+    let mut configure = command(
+        &*build_root.with_suffix("configure"),
+        working_directory,
+        target,
+        dependencies.clone(),
+    )?;
 
     configure.arg(flag("prefix", target.prefix()));
     configure.arg(flag("bindir", target.executables()));
@@ -172,13 +211,13 @@ fn configure_make(
         configure.arg(&**flag);
     }
 
-    let mut compile = command("make", working_directory);
+    let mut compile = command("make", working_directory, target, dependencies.clone())?;
     compile.arg(format!("-j{cpu_count}"));
 
-    let mut install = command("make", working_directory);
+    let mut install = command("make", working_directory, target, dependencies)?;
     install
         .arg("install")
         .env(CONFIGURE_MAKE_DISTINATION_DIRECTORY, image);
 
-    [configure, compile, install]
+    Ok([configure, compile, install])
 }

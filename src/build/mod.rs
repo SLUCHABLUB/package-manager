@@ -38,7 +38,7 @@ pub(crate) fn build<'dependencies, Items>(
     host: &HostDirectories,
 ) -> anyhow::Result<Image>
 where
-    Items: IntoIterator<Item = &'dependencies Image> + Send,
+    Items: IntoIterator<Item = &'dependencies Image> + Clone + Send,
 {
     let image = match Image::find_cached(recipe, host)? {
         Ok(cached) => return Ok(cached),
@@ -70,6 +70,7 @@ where
         &working_directory,
         target_directories,
         &mut copies,
+        dependencies.clone(),
     )?;
 
     let image = build_in_sandbox(
@@ -97,7 +98,7 @@ fn build_in_sandbox<'dependencies, Images>(
     sandbox: Sandbox,
 ) -> anyhow::Result<Image>
 where
-    Images: IntoIterator<Item = &'dependencies Image> + Send,
+    Images: IntoIterator<Item = &'dependencies Image> + Clone + Send,
 {
     // TODO: Allow automatic sandbox downgrading.
     match sandbox {

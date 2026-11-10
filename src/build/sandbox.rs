@@ -80,6 +80,11 @@ pub(super) fn landlock_current_thread<'dependencies>(
         AccessFs::from_all(ABI),
     ))?;
 
+    ruleset = ruleset.add_rule(PathBeneath::new(
+        PathFd::new("/dev/null")?,
+        AccessFs::from_file(ABI),
+    ))?;
+
     let status = ruleset.restrict_self()?;
 
     match status.landlock {

@@ -20,6 +20,7 @@ use crate::recipe::Build;
 use crate::stage;
 use anyhow::anyhow;
 use fn_error_context::context;
+use itertools::Itertools;
 use petgraph::acyclic::AcyclicEdgeError;
 use petgraph::graph::NodeIndex;
 use std::collections::BTreeSet;
@@ -350,7 +351,7 @@ impl BuildPlan {
                 let image = build(
                     downloaded.recipe,
                     downloaded.source,
-                    children.map(|built| &built.image),
+                    children.map(|built| &built.image).collect_vec(),
                     sandbox,
                     target,
                     host,
